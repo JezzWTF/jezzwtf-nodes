@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-jezzwtf-nodes"
+description = "JezzWTF custom nodes for ComfyUI — utility nodes."
+version = "1.0.0"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/JezzWTF/comfyui-jezzwtf-nodes"
+
+[tool.comfy]
+PublisherId = "jezzwtf"
+DisplayName = "JezzWTF Nodes"
+Icon = ""

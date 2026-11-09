@@ -2,7 +2,7 @@
 
 ![Run Timer with history, Duration to Frames, Video Compare and Paste Stack](assets/overview.webp)
 
-Quality-of-life nodes and canvas tools for [ComfyUI](https://github.com/comfyanonymous/ComfyUI): utilities, character chat and cards, LoRA and model loaders, MiniMax H3 RefMod, GIF tools, a run timer with history, and a clipboard paste stack.
+Quality-of-life nodes and canvas tools for [ComfyUI](https://github.com/comfyanonymous/ComfyUI): utilities, character chat and cards, LoRA and model loaders, MiniMax H3 RefMod, GIF tools, a run timer with history, an image gallery loader, audio tools and a clipboard paste stack.
 
 Each node family loads in its own `try/except`, so a problem in one can't take down the others.
 
@@ -16,6 +16,7 @@ Each node family loads in its own `try/except`, so a problem in one can't take d
   - [Characters and LLMs](#characters-and-llms)
   - [Loaders and LoRA](#loaders-and-lora)
   - [MiniMax H3 RefMod](#minimax-h3-refmod)
+  - [Audio](#audio)
   - [Video](#video)
   - [GIF Tools](#gif-tools)
 - [Frontend extensions](#frontend-extensions)
@@ -72,6 +73,7 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 | Get Image | Grab an in-graph image as IMAGE and MASK |
 | Draw Image | Layered sketch pad that loads like Load Image, with pressure, undo and zoom |
 | Multi Load Image | Up to 16 image slots, each with its own output |
+| Gallery Load | Pick one or many images in a floating gallery window (input or output folders, folders, search) and load them as a batch |
 | Multi Switch | Route several values by one switch |
 | Folder Image Batch / Folder Video Batch | One file per run from a folder, with whole-folder auto-run |
 | Save Caption (Match Image) | Save a caption as a `.txt` named after the file just loaded |
@@ -80,9 +82,10 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 
 ## Run Timer
 
-A non-destructive timer for a whole workflow run. A wired value passes through unchanged, and the node also works unconnected.
+Times every workflow run, with or without the node on the canvas. The node is a display you can add at any time, even mid-run.
 
-- Big clock card on the node, with a status dot and a colon that beats once per second while running.
+- Big clock card on the node, digital or a circular smartwatch ring, with your choice of colour, font and background (hover the card and click style). It has a status dot and colons that alternate one second on and one second off while running.
+- A floating timer, on by default (turn it off in Settings → JezzWTF → Run Timer): always on screen without a node, no frame so the ring is truly round, draggable and resizable, with laps, ticks or comet motion, and it remembers its place and style.
 - Every timed run is saved on the server (newest 500), so history survives reloads.
 - A floating history panel, like Paste Stack: draggable, resizable, minimizes to a chip showing the running time. It has count, average, median, best and worst, filters by label and status, per-row delete, and CSV and JSON export.
 - Rename the node to label its runs in the history.
@@ -127,6 +130,15 @@ A RefMod is a `.safetensors` file of reference latents (portraits, a short clip,
 | H3 Upscale Picker | Same-scale target sizes for the H3 latent upscaler |
 | Ultimate KSampler / H3 KSampler | Samplers with live video preview |
 
+## Audio
+
+Category `JezzWTF/audio`.
+
+| Node | What it does |
+|---|---|
+| Audio Loader | Load an audio file from the input folder (subfolders included) with an upload button, a player, trim and mono mix |
+| Album Cover | Embed an image as the cover art of an mp3, flac or m4a file, with optional title, artist and album tags |
+
 ## Video
 
 Category `JezzWTF/video`.
@@ -152,7 +164,12 @@ Uses ffmpeg (the `imageio-ffmpeg` build, a system ffmpeg, or the `JWTF_FFMPEG` e
 
 # Frontend extensions
 
+- **JezzWTF Workflows** opens a floating browser for saved workflows with graph previews, folder filters, search and favourites.
+- **JezzWTF Documentation** opens a floating editor for searchable pages that travel with the saved workflow. Both panels are available from the canvas context menu and command palette.
 - **Paste Stack**: a floating clipboard history for text, images and files. Click a card to copy it back, or drag an image card onto a Load Image node. Persists across reloads and minimizes to a chip.
+- **Workflows window**: browse your saved workflows and the bundled examples as cards with thumbnails. Search looks inside workflows (models, prompts, notes), with folders, favourites and what-it-makes and model categories. A floating panel like Paste Stack: it never blocks the canvas and remembers its place. Open it from the top bar, Alt+Shift+W, the canvas right-click menu or the command palette.
+- **Canvas tools**: tidy a graph by dependency, align and distribute, group the selection, and a Ctrl+Alt bypass slash. They live in the command palette (Alt+Shift+T tidies, Alt+Shift+G groups).
+- **Documentation window**: a floating, searchable, read-only help for every node in the pack, including where each node saves its files (Alt+Shift+D).
 
 # Example workflows
 
@@ -164,6 +181,8 @@ Drag a file from [`example_workflows/`](example_workflows/) into ComfyUI.
 | `Character_Chat.json` | The minimal setup: load Qwen3.5, pick a character card, chat, and Save chat | Qwen3.5 and a character card |
 | `Video_to_GIF_Optimised.json` | Load a video and optimise it into the best-looking GIF under a size budget | Nothing beyond core |
 | `GIF_Optimise_and_Compare.json` | Load a GIF, re-encode it, and compare the result with the original: sizes, SSIM and a side-by-side | Nothing beyond core |
+| `Dataset_Captioning.json` | Caption a whole folder of images with Qwen3.5 and save a `.txt` next to each one, ready for LoRA training | Qwen3.5 |
+| `RefMod_Bake_and_Apply_H3.json` | Bake a character portrait into a RefMod, apply it to MiniMax H3 reference-to-video and generate a clip | MiniMax H3 reference model, text encoder and VAEs |
 
 # License
 

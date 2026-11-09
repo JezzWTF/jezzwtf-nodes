@@ -1,0 +1,1323 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "revision": 0,
+  "last_node_id": 14,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CLIPLoader",
+      "pos": [
+        30,
+        70
+      ],
+      "size": [
+        340,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip_name",
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "type",
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "device",
+          "name": "device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CLIP",
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3,
+            8
+          ]
+        }
+      ],
+      "title": "Load Qwen3.5 9B",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3.5_9b_w4a8_gptq.safetensors",
+        "stable_diffusion",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        30,
+        230
+      ],
+      "size": [
+        460,
+        300
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "value",
+          "name": "value",
+          "type": "STRING",
+          "widget": {
+            "name": "value"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "title": "Instruction (editable)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "Write a Character Card V2 as ONE valid JSON object and nothing else (no markdown fences, no commentary). Use exactly this shape: {\"spec\": \"chara_card_v2\", \"spec_version\": \"2.0\", \"data\": {\"name\": string, \"description\": string, \"personality\": string, \"scenario\": string, \"first_mes\": string, \"mes_example\": string (one string; separate dialogue lines with \\n and start each example with <START>; never use <START> in any other field), \"creator_notes\": string, \"system_prompt\": string, \"post_history_instructions\": string, \"alternate_greetings\": [string, ...], \"tags\": [string, ...], \"creator\": string, \"character_version\": \"1.0\", \"extensions\": {}}}. Every value except the two lists and extensions is a plain string. Use single quotes inside dialogue so no double quote needs escaping. Concept:"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        30,
+        570
+      ],
+      "size": [
+        460,
+        150
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "value",
+          "name": "value",
+          "type": "STRING",
+          "widget": {
+            "name": "value"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "title": "Concept",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "A sarcastic retired space pirate who now keeps a lighthouse on a quiet ocean world."
+      ]
+    },
+    {
+      "id": 4,
+      "type": "StringConcatenate",
+      "pos": [
+        540,
+        230
+      ],
+      "size": [
+        400,
+        260
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "string_a",
+          "name": "string_a",
+          "type": "STRING",
+          "widget": {
+            "name": "string_a"
+          },
+          "link": 1
+        },
+        {
+          "localized_name": "string_b",
+          "name": "string_b",
+          "type": "STRING",
+          "widget": {
+            "name": "string_b"
+          },
+          "link": 2
+        },
+        {
+          "localized_name": "delimiter",
+          "name": "delimiter",
+          "type": "STRING",
+          "widget": {
+            "name": "delimiter"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "title": "Instruction + Concept",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "StringConcatenate"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "\n\n"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "TextGenerate",
+      "pos": [
+        990,
+        70
+      ],
+      "size": [
+        470,
+        640
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "video",
+          "name": "video",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": 4
+        },
+        {
+          "localized_name": "max_length",
+          "name": "max_length",
+          "type": "INT",
+          "widget": {
+            "name": "max_length"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temperature",
+          "name": "sampling_mode.temperature",
+          "type": "FLOAT",
+          "widget": {
+            "name": "sampling_mode.temperature"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "top_k",
+          "name": "sampling_mode.top_k",
+          "type": "INT",
+          "widget": {
+            "name": "sampling_mode.top_k"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "top_p",
+          "name": "sampling_mode.top_p",
+          "type": "FLOAT",
+          "widget": {
+            "name": "sampling_mode.top_p"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_p",
+          "name": "sampling_mode.min_p",
+          "type": "FLOAT",
+          "widget": {
+            "name": "sampling_mode.min_p"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "repetition_penalty",
+          "name": "sampling_mode.repetition_penalty",
+          "type": "FLOAT",
+          "widget": {
+            "name": "sampling_mode.repetition_penalty"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "sampling_mode.seed",
+          "type": "INT",
+          "widget": {
+            "name": "sampling_mode.seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "presence_penalty",
+          "name": "sampling_mode.presence_penalty",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "sampling_mode.presence_penalty"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sampling_mode",
+          "name": "sampling_mode",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "sampling_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "thinking",
+          "name": "thinking",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "thinking"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "use_default_template",
+          "name": "use_default_template",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "use_default_template"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "generated_text",
+          "name": "generated_text",
+          "type": "STRING",
+          "links": [
+            6,
+            7,
+            13
+          ]
+        }
+      ],
+      "title": "Generate Text",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "TextGenerate"
+      },
+      "widgets_values": [
+        "",
+        1500,
+        "on",
+        0.7,
+        64,
+        0.95,
+        0.05,
+        1.05,
+        0,
+        0,
+        false,
+        true
+      ]
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "pos": [
+        30,
+        890
+      ],
+      "size": [
+        320,
+        400
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            5,
+            12
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "title": "Load Portrait",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "Note",
+      "pos": [
+        380,
+        890
+      ],
+      "size": [
+        160,
+        200
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Swap-in note",
+      "properties": {},
+      "widgets_values": [
+        "Pick a portrait here. Any image generator that outputs an IMAGE can replace this node."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 8,
+      "type": "JWTFV2PNGBaker",
+      "pos": [
+        630,
+        890
+      ],
+      "size": [
+        390,
+        420
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 5
+        },
+        {
+          "localized_name": "json_text",
+          "name": "json_text",
+          "type": "STRING",
+          "link": 6
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fill_missing_fields",
+          "name": "fill_missing_fields",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "fill_missing_fields"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "saved_path",
+          "name": "saved_path",
+          "type": "STRING",
+          "links": [
+            9
+          ]
+        },
+        {
+          "localized_name": "character_name",
+          "name": "character_name",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "JezzWTF/comfyui-jezzwtf-nodes",
+        "ver": "79ed22136aa39fb5a0ddba6f6d10b9ac5a172f78",
+        "Node name for S&R": "JWTFV2PNGBaker"
+      },
+      "widgets_values": [
+        "%name%",
+        true,
+        "characters folder"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "PreviewAny",
+      "pos": [
+        1050,
+        890
+      ],
+      "size": [
+        420,
+        400
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "source",
+          "name": "source",
+          "type": "*",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "Card JSON",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [
+        null,
+        null,
+        false
+      ]
+    },
+    {
+      "id": 10,
+      "type": "JWTFCharacterChat",
+      "pos": [
+        1590,
+        70
+      ],
+      "size": [
+        520,
+        720
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 8
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "localized_name": "video",
+          "name": "video",
+          "shape": 7,
+          "type": "VIDEO",
+          "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "localized_name": "character",
+          "name": "character",
+          "type": "COMBO",
+          "widget": {
+            "name": "character"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "user_name",
+          "name": "user_name",
+          "type": "STRING",
+          "widget": {
+            "name": "user_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_length",
+          "name": "max_length",
+          "type": "INT",
+          "widget": {
+            "name": "max_length"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temperature",
+          "name": "temperature",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temperature"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "top_p",
+          "name": "top_p",
+          "type": "FLOAT",
+          "widget": {
+            "name": "top_p"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "top_k",
+          "name": "top_k",
+          "type": "INT",
+          "widget": {
+            "name": "top_k"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_p",
+          "name": "min_p",
+          "type": "FLOAT",
+          "widget": {
+            "name": "min_p"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "repetition_penalty",
+          "name": "repetition_penalty",
+          "type": "FLOAT",
+          "widget": {
+            "name": "repetition_penalty"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "thinking",
+          "name": "thinking",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "thinking"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "context_messages",
+          "name": "context_messages",
+          "type": "INT",
+          "widget": {
+            "name": "context_messages"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "card_path",
+          "name": "card_path",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "card_path"
+          },
+          "link": 9
+        },
+        {
+          "localized_name": "action",
+          "name": "action",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "action"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "user_message",
+          "name": "user_message",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "user_message"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "history_json",
+          "name": "history_json",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "history_json"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "presence_penalty",
+          "name": "presence_penalty",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "presence_penalty"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "mtp",
+          "name": "mtp",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "mtp"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "video_max_frames",
+          "name": "video_max_frames",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "video_max_frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sampling_mode",
+          "name": "sampling_mode",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "sampling_mode"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "reply",
+          "name": "reply",
+          "type": "STRING",
+          "links": [
+            10
+          ]
+        },
+        {
+          "localized_name": "chat_log",
+          "name": "chat_log",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "character_name",
+          "name": "character_name",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "description",
+          "name": "description",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "avatar",
+          "name": "avatar",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        },
+        {
+          "localized_name": "history_json",
+          "name": "history_json",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "JezzWTF/comfyui-jezzwtf-nodes",
+        "ver": "79ed22136aa39fb5a0ddba6f6d10b9ac5a172f78",
+        "Node name for S&R": "JWTFCharacterChat"
+      },
+      "widgets_values": [
+        "(none - add cards to input/characters)",
+        "User",
+        512,
+        0.7,
+        0.95,
+        64,
+        0.05,
+        1.05,
+        0,
+        "randomize",
+        false,
+        40,
+        "",
+        "send",
+        "Hello! Tell me who you are and what brought you here.",
+        "[]",
+        0,
+        "auto",
+        8,
+        "on"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "PreviewAny",
+      "pos": [
+        2140,
+        70
+      ],
+      "size": [
+        390,
+        400
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "source",
+          "name": "source",
+          "type": "*",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "STRING",
+          "name": "STRING",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "Reply",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [
+        null,
+        null,
+        false
+      ]
+    },
+    {
+      "id": 12,
+      "type": "PreviewImage",
+      "pos": [
+        2140,
+        520
+      ],
+      "size": [
+        390,
+        360
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "title": "Avatar",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.1",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "MarkdownNote",
+      "pos": [
+        1590,
+        1440
+      ],
+      "size": [
+        940,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Character Creator - flow",
+      "properties": {},
+      "widgets_values": [
+        "1. Edit the instruction and concept, then run: Qwen3.5 writes a Character Card V2 JSON.\n2. Load Portrait supplies the avatar; swap in a generator for new art.\n3. The baker saves the card PNG into input/characters, so it appears in Character Chat's character list (press the refresh button on the chat panel) and in any other chat workflow.\n4. Character Chat reads that card straight away (card_path); set action/user_message to keep talking.\n5. Saving: the card is saved by the baker every run. Use Save chat on the chat panel to write the conversation to output/chats (.txt and .json). The chat is also kept inside this workflow, so save the workflow itself (Ctrl+S) to resume later.\n6. Group 3b bakes the same card into a character .safetensors in models/refmods. Character Chat lists it as refmod:<name> after a refresh. Bypass the node if you only want the PNG."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 14,
+      "type": "JWTFRefmodCardBaker",
+      "pos": [
+        630,
+        1450
+      ],
+      "size": [
+        390,
+        380
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 12
+        },
+        {
+          "localized_name": "json_text",
+          "name": "json_text",
+          "type": "STRING",
+          "link": 13
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "base_refmod",
+          "name": "base_refmod",
+          "type": "COMBO",
+          "widget": {
+            "name": "base_refmod"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "avatar_max_size",
+          "name": "avatar_max_size",
+          "type": "INT",
+          "widget": {
+            "name": "avatar_max_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fill_missing_fields",
+          "name": "fill_missing_fields",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "fill_missing_fields"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "localized_name": "base_refmod_path",
+          "name": "base_refmod_path",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "base_refmod_path"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "save_to",
+          "name": "save_to",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "save_to"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "saved_path",
+          "name": "saved_path",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "character_name",
+          "name": "character_name",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "Bake character .safetensors",
+      "properties": {
+        "Node name for S&R": "JWTFRefmodCardBaker"
+      },
+      "widgets_values": [
+        "%name%",
+        "(none - character-only file)",
+        512,
+        true,
+        "",
+        "refmods folder"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      4,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      1,
+      "STRING"
+    ],
+    [
+      3,
+      1,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      4,
+      "STRING"
+    ],
+    [
+      5,
+      6,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      5,
+      0,
+      8,
+      1,
+      "STRING"
+    ],
+    [
+      7,
+      5,
+      0,
+      9,
+      0,
+      "STRING"
+    ],
+    [
+      8,
+      1,
+      0,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      9,
+      8,
+      0,
+      10,
+      16,
+      "STRING"
+    ],
+    [
+      10,
+      10,
+      0,
+      11,
+      0,
+      "STRING"
+    ],
+    [
+      11,
+      10,
+      4,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      6,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      5,
+      0,
+      14,
+      1,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. LLM - concept to Character Card V2 JSON",
+      "bounding": [
+        0,
+        0,
+        1500,
+        760
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Avatar",
+      "bounding": [
+        0,
+        820,
+        560,
+        520
+      ],
+      "color": "#a1309b",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. Bake card PNG",
+      "bounding": [
+        600,
+        820,
+        900,
+        520
+      ],
+      "color": "#b58b2a",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. Chat with the new card",
+      "bounding": [
+        1560,
+        0,
+        1000,
+        1340
+      ],
+      "color": "#3f9e5a",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "How it works",
+      "bounding": [
+        1560,
+        1380,
+        1000,
+        300
+      ],
+      "color": "#8A8A8A",
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "3b. Bake the same character as a .safetensors (optional)",
+      "bounding": [
+        600,
+        1380,
+        900,
+        520
+      ],
+      "color": "#b58b2a",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

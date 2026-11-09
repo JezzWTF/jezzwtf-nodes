@@ -235,7 +235,7 @@ export class RunTracker {
   start(promptId, info) {
     const run = {
       promptId, startedAt: info.startedAt, label: info.label ?? "", workflow: info.workflow ?? "", nodeCount: info.nodeCount ?? 0,
-      hasTimer: info.hasTimer !== false, approx: !!info.approx, titles: info.titles ?? {}, timeline: new NodeTimeline(), classified: null,
+      hasTimer: true, approx: !!info.approx, titles: info.titles ?? {}, timeline: new NodeTimeline(), classified: null,
     };
     this.runs.delete(promptId);
     this.runs.set(promptId, run);

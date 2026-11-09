@@ -1,45 +1,39 @@
-"""The Run Timer node: a pass-through that marks a workflow as "time this run".
+"""The Run Timer node: a small display of the current and last run.
 
-The timing itself is done by the browser (see js/run_timer) from ComfyUI execution events; the node
-only tells the server when it executed and hands its optional input straight back, untouched.
+Every run is timed by the browser (see js/run_timer) from ComfyUI execution events, node or no node; this node
+only shows the stopwatch, can label its runs, and tells the server when it executed.
 """
 from __future__ import annotations
+
+from comfy_api.latest import io
 
 from .live import LIVE
 from .store import now_ms
 
 try:
     from ..utility_core._comfy import current_prompt_id
-    from ..utility_core._types import ANY, CATEGORY_UTILS, InputTypes
 except ImportError:  # imported as a top-level package (tests)
     from utility_core._comfy import current_prompt_id  # type: ignore[no-redef]
-    from utility_core._types import ANY, CATEGORY_UTILS, InputTypes  # type: ignore[no-redef]
 
 
-class JWTFRunTimer:
-    CATEGORY = CATEGORY_UTILS
-    FUNCTION = "run"
-    OUTPUT_NODE = True  # executes even with nothing wired to it
-    RETURN_TYPES = (ANY,)
-    RETURN_NAMES = ("value",)
+class JWTFRunTimer(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRunTimer",
+            display_name='Run Timer',
+            category='JezzWTF/utils',
+            description="A display of the current and last run time. Every run is timed whether or not this node is on the canvas; renaming it labels its runs.",
+            inputs=[
+                io.String.Input("label", default='', multiline=False, optional=True),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "optional": {
-                "value": (ANY, {}),
-                "label": ("STRING", {"default": "", "multiline": False}),
-            },
-        }
-
-    # No IS_CHANGED on purpose. A value that never repeats (NaN) would also force every node wired
-    # downstream of this pass-through to recompute on every queue. Run history comes from the frontend
-    # execution events, so the node does not need to execute each time to be recorded.
-
-    def run(self, value: object = None, label: str = "") -> tuple[object]:
+    def execute(cls, label: str = "") -> io.NodeOutput:
         LIVE.mark(current_prompt_id(), label if isinstance(label, str) else "", now_ms())
-        return (value,)
+        return io.NodeOutput()
 
 
-NODE_CLASS_MAPPINGS = {"JWTFRunTimer": JWTFRunTimer}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFRunTimer": "Run Timer"}
+NODES = [JWTFRunTimer]

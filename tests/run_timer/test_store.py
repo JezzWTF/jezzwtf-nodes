@@ -9,7 +9,8 @@ import pytest
 
 from run_timer import store as S
 from run_timer.live import MAX_LIVE, LiveRuns
-from run_timer.node import JWTFRunTimer, NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from run_timer.node import JWTFRunTimer, NODES
+from v3_helpers import legacy, legacy_spec, overrides
 
 NOW = 1_800_000_000_000
 
@@ -215,18 +216,15 @@ def test_live_registry_keeps_first_mark_and_is_bounded() -> None:
 
 
 def test_node_contract() -> None:
-    assert NODE_CLASS_MAPPINGS == {"JWTFRunTimer": JWTFRunTimer} and NODE_DISPLAY_NAME_MAPPINGS == {"JWTFRunTimer": "Run Timer"}
-    spec = JWTFRunTimer.INPUT_TYPES()
-    assert not spec.get("required") and set(spec["optional"]) == {"value", "label"}
-    assert spec["optional"]["label"][0] == "STRING" and spec["optional"]["value"][0] == "*"
-    assert JWTFRunTimer.RETURN_TYPES == ("*",) and JWTFRunTimer.RETURN_NAMES == ("value",)
-    assert JWTFRunTimer.CATEGORY == "JezzWTF/utils" and JWTFRunTimer.OUTPUT_NODE is True
-    # Cache-friendly: no custom signature, so a wired value does not invalidate its downstream nodes.
-    assert not hasattr(JWTFRunTimer, "IS_CHANGED")
+    schema = JWTFRunTimer.GET_SCHEMA()
+    assert NODES == [JWTFRunTimer] and schema.node_id == "JWTFRunTimer" and schema.display_name == "Run Timer"
+    spec = legacy_spec(JWTFRunTimer)
+    assert not spec.get("required") and set(spec["optional"]) == {"label"}
+    assert spec["optional"]["label"][0] == "STRING" and not JWTFRunTimer.RETURN_TYPES
+    assert schema.category == "JezzWTF/utils" and JWTFRunTimer.OUTPUT_NODE is True
+    assert not overrides(JWTFRunTimer, "fingerprint_inputs")
 
 
-def test_node_passes_values_through_untouched() -> None:
-    marker = object()
-    node = JWTFRunTimer()
-    assert node.run(value=marker, label="x")[0] is marker
-    assert node.run() == (None,)
+def test_node_has_no_pass_through_slots() -> None:
+    assert legacy(JWTFRunTimer.execute(label="x")) == ()
+    assert legacy(JWTFRunTimer.execute()) == ()

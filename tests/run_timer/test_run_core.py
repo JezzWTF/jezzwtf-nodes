@@ -43,6 +43,51 @@ def test_format_clock_and_chip() -> None:
     }
 
 
+def test_node_indicators_switch_at_elapsed_second_boundaries() -> None:
+    node_module = CORE.with_name("run_timer.js").as_uri()
+    out = run_js(
+        f"""
+        const {{ readFileSync }} = process.getBuiltinModule('node:fs');
+        const {{ runInNewContext }} = process.getBuiltinModule('node:vm');
+        const source = readFileSync(new URL({json.dumps(node_module)}), 'utf8').replace(/^import .*;$/gm, '');
+        let elapsed = null, refresh, extension, root;
+        const controller = {{
+            primary: () => elapsed === null ? null : {{ elapsed }},
+            subscribe: callback => {{ refresh = callback; }},
+        }};
+        runInNewContext(source, {{
+            app: {{ registerExtension: value => {{ extension = value; }} }},
+            window: {{ __jwtfRunTimerShared: {{ controller, panel: {{}} }} }},
+            document: (() => {{
+                const make = () => ({{
+                    dataset: {{}}, append() {{}}, setAttribute() {{}}, addEventListener() {{}}, insertBefore() {{}},
+                    style: {{ setProperty() {{}} }}, querySelector() {{ return null; }},
+                    classList: {{ add() {{}}, toggle(_name, off) {{ this.off = off; }} }},
+                }});
+                return {{ createElement: make, createElementNS: make }};
+            }})(),
+            ensureStylesheet() {{}}, nodeSummary: () => ({{ count: 0 }}), AbortController,
+            sanitize: () => ({{ face: 'digital', statusTint: true }}), cssVars: () => ({{}}), aspectOf: () => 2,
+            ringState: () => ({{ lap: 0, frac: 0 }}), lapMsFor: () => 60000, ANIMS: {{}}, LAPS: {{}}, accent: () => '#fff', FACES: {{}}, SKINS: {{}}, handAngles: () => ({{ second: 0, minute: 0 }}), FONTS: {{}}, THEMES: {{}}, BACKGROUNDS: {{}},
+        }});
+        class Timer {{
+            size = [340, 150];
+            computeSize() {{ return this.size; }}
+            setSize() {{}}
+            addDOMWidget(_name, _type, element) {{ root = element; }}
+        }}
+        extension.beforeRegisterNodeDef(Timer, {{ name: 'JWTFRunTimer' }});
+        new Timer().onNodeCreated();
+        return [0, 999, 1000, 1999, 2000, 3599999, 3600000, null].map(value => {{
+            elapsed = value;
+            refresh('tick');
+            return root.classList.off;
+        }});
+        """
+    )
+    assert out == [False, False, True, True, False, True, False, False]
+
+
 def test_time_ago() -> None:
     out = run_js("return [0, 4000, 12000, 59000, 61000, 3600000, 7300000, 90000000, -9000].map((d) => L.timeAgo(1000000 - d, 1000000));")
     assert out == ["just now", "just now", "12s ago", "59s ago", "1m ago", "1h ago", "2h ago", "1d ago", "just now"]
@@ -201,7 +246,7 @@ def test_tracker_handles_queued_prompts_by_prompt_id() -> None:
     assert out["empty"] is None and out["none"] is None
 
 
-def test_unknown_record_has_no_duration_and_runs_without_timer_are_inactive() -> None:
+def test_unknown_record_has_no_duration_and_every_run_is_tracked() -> None:
     out = run_js(
         """
         const t = new L.RunTracker();
@@ -212,7 +257,7 @@ def test_unknown_record_has_no_duration_and_runs_without_timer_are_inactive() ->
         """
     )
     assert isinstance(out, dict)
-    assert out["act"] == 0 and out["rec"]["duration_ms"] is None and out["rec"]["status"] == "unknown" and out["rec"]["slowest"] == [] and out["rec"]["started_at"] == 500
+    assert out["act"] == 1 and out["rec"]["duration_ms"] is None and out["rec"]["status"] == "unknown" and out["rec"]["slowest"] == [] and out["rec"]["started_at"] == 500
 
 
 def test_tracker_is_bounded() -> None:

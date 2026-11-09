@@ -177,7 +177,8 @@ export function createController() {
 
   function beginRun(pid, info) {
     const run = tracker.start(pid, info);
-    if (run.hasTimer) { journalSet(run); ensureTimers(); }
+    journalSet(run);
+    ensureTimers();
     return run;
   }
 
@@ -185,14 +186,13 @@ export function createController() {
     run.classified = (async () => {
       const scan = scanPrompt(await findPrompt(run.promptId));
       if (!scan.nodeCount) return; // prompt not found: keep the open-graph fallback
-      run.hasTimer = scan.hasTimer;
       run.nodeCount = scan.nodeCount;
       run.titles = scan.titles;
       if (scan.label) run.label = scan.label;
-      if (run.hasTimer) { journalSet(run); ensureTimers(); } else { journalDel(run.promptId); stopTimersIfIdle(); }
+      journalSet(run);
     })().catch(() => { /* keep the fallback */ });
     run.classified.then(() => {
-      if (destroyed || !run.hasTimer) return;
+      if (destroyed) return;
       notify("change");
       hooks.onRunStarted?.(run);
     });
@@ -204,7 +204,7 @@ export function createController() {
     const stamp = isNum(detail.timestamp) ? detail.timestamp : serverNow();
     if (isNum(detail.timestamp)) skew = detail.timestamp - Date.now();
     const fallback = openGraphTimer();
-    const run = beginRun(pid, { startedAt: stamp, label: fallback.label, workflow: activeWorkflowName(), hasTimer: fallback.hasTimer });
+    const run = beginRun(pid, { startedAt: stamp, label: fallback.label, workflow: activeWorkflowName() });
     run.seenAt = Date.now();
     classify(run);
     notify("change");
@@ -239,7 +239,6 @@ export function createController() {
     notify("change");
     await run.classified;
     journalDel(pid);
-    if (!run.hasTimer) return;
     await commit(buildRecord(run, status, endedAt, names.get(pid)));
   }
 
@@ -251,7 +250,6 @@ export function createController() {
       outcome = outcomeFromHistory(body?.[run.promptId]);
     } catch { /* history unreachable: unknown */ }
     journalDel(run.promptId);
-    if (!run.hasTimer) return;
     const exact = outcome && outcome.startedAt !== null && outcome.endedAt !== null;
     if (exact) run.startedAt = outcome.startedAt;
     const draft = buildRecord(run, exact ? outcome.status : "unknown", exact ? outcome.endedAt : null, names.get(run.promptId));
@@ -305,7 +303,6 @@ export function createController() {
     for (const [pid, prompt] of queue.running) {
       if (tracker.get(pid)) continue;
       const scan = scanPrompt(prompt);
-      if (!scan.hasTimer) continue;
       const hint = liveRuns.find((r) => r.prompt_id === pid);
       const run = tracker.start(pid, {
         startedAt: isNum(hint?.executed_at) ? hint.executed_at : serverNow(), label: scan.label, nodeCount: scan.nodeCount,

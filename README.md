@@ -40,6 +40,7 @@ Restart ComfyUI, then hard-refresh the browser tab.
 # Requirements
 
 - **ComfyUI 0.44.0 or newer.** This is the version the pack is tested on.
+- **Local ComfyUI only.** The pack reads and writes local folders, talks to LM Studio and Civitai, keeps run history on disk and reads the OS clipboard, so it is not meant for Comfy Cloud.
 - Nothing else to install. Some features use optional packages when they are present:
 
 | Package | Used for |

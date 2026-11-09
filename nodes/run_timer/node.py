@@ -32,9 +32,9 @@ class JWTFRunTimer:
             },
         }
 
-    @classmethod
-    def IS_CHANGED(cls, **_: object) -> float:
-        return float("nan")  # never cached away: it must run on every queue
+    # No IS_CHANGED on purpose. A value that never repeats (NaN) would also force every node wired
+    # downstream of this pass-through to recompute on every queue. Run history comes from the frontend
+    # execution events, so the node does not need to execute each time to be recorded.
 
     def run(self, value: object = None, label: str = "") -> tuple[object]:
         LIVE.mark(current_prompt_id(), label if isinstance(label, str) else "", now_ms())

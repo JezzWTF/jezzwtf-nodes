@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import math
 import os
 from pathlib import Path
 
@@ -222,7 +221,8 @@ def test_node_contract() -> None:
     assert spec["optional"]["label"][0] == "STRING" and spec["optional"]["value"][0] == "*"
     assert JWTFRunTimer.RETURN_TYPES == ("*",) and JWTFRunTimer.RETURN_NAMES == ("value",)
     assert JWTFRunTimer.CATEGORY == "JezzWTF/utils" and JWTFRunTimer.OUTPUT_NODE is True
-    assert math.isnan(JWTFRunTimer.IS_CHANGED()) and math.isnan(JWTFRunTimer.IS_CHANGED(value=1, label="x"))
+    # Cache-friendly: no custom signature, so a wired value does not invalidate its downstream nodes.
+    assert not hasattr(JWTFRunTimer, "IS_CHANGED")
 
 
 def test_node_passes_values_through_untouched() -> None:

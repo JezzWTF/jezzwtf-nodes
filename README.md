@@ -45,7 +45,6 @@ Restart ComfyUI, then hard-refresh the browser tab.
 | Package | Used for |
 |---|---|
 | `imageio-ffmpeg` or a system `ffmpeg` | GIF Tools (falls back to Pillow with a warning) |
-| `scikit-image` | GIF quality scores (SSIM) |
 | `opencv-python` | Video frame sampling for LM Studio and Character Chat |
 | `soundfile` | Sending audio to LM Studio |
 | `requests` | LM Studio streaming |

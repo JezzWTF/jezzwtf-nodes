@@ -1,0 +1,580 @@
+{
+  "id": "d830161f-fc5d-419d-8c46-6adc85972740",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "PrimitiveString",
+      "pos": [
+        40,
+        90
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            1,
+            2
+          ]
+        }
+      ],
+      "title": "GIF path (full path to a .gif)",
+      "properties": {
+        "Node name for S&R": "PrimitiveString",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "C:/path/to/your.gif"
+      ],
+      "widgets_values_named": {
+        "value": "C:/path/to/your.gif"
+      }
+    },
+    {
+      "id": 2,
+      "type": "JWTFGifOptimise",
+      "pos": [
+        440,
+        90
+      ],
+      "size": [
+        420,
+        940
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "path",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "path"
+          },
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "gif_path",
+          "type": "STRING",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JWTFGifOptimise",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "your.gif",
+        "smallest",
+        "optimised",
+        "",
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        "lanczos",
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        "auto",
+        "auto",
+        -1,
+        true,
+        "auto",
+        "exact",
+        2,
+        10,
+        120,
+        true,
+        "image"
+      ],
+      "widgets_values_named": {
+        "gif": "your.gif",
+        "mode": "smallest",
+        "filename_prefix": "optimised",
+        "path": "",
+        "fps": 0,
+        "trim_start": 0,
+        "trim_end": 0,
+        "speed": 1,
+        "max_width": 0,
+        "max_height": 0,
+        "resize_filter": "lanczos",
+        "crop_left": 0,
+        "crop_top": 0,
+        "crop_right": 0,
+        "crop_bottom": 0,
+        "loop_count": 0,
+        "colors": 0,
+        "palette": "auto",
+        "dither": "auto",
+        "dedupe_threshold": -1,
+        "transparency_opt": true,
+        "denoise": "auto",
+        "delay_mode": "exact",
+        "target_size_mb": 2,
+        "max_trials": 10,
+        "time_budget_s": 120,
+        "compare_naive": true,
+        "upload": "image"
+      }
+    },
+    {
+      "id": 3,
+      "type": "JWTFGifCompare",
+      "pos": [
+        900,
+        90
+      ],
+      "size": [
+        420,
+        340
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images_a",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "images_b",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "gif_a",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "gif_a"
+          },
+          "link": 2
+        },
+        {
+          "name": "gif_b",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "gif_b"
+          },
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "compare",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JWTFGifCompare",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "side_by_side",
+        "",
+        "",
+        20,
+        20,
+        24,
+        60
+      ],
+      "widgets_values_named": {
+        "layout": "side_by_side",
+        "gif_a": "",
+        "gif_b": "",
+        "fps_a": 20,
+        "fps_b": 20,
+        "sample_frames": 24,
+        "output_frames": 60
+      }
+    },
+    {
+      "id": 4,
+      "type": "PreviewImage",
+      "pos": [
+        1360,
+        90
+      ],
+      "size": [
+        420,
+        360
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Compare",
+      "properties": {
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "PreviewAny",
+      "pos": [
+        900,
+        470
+      ],
+      "size": [
+        420,
+        260
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "Report",
+      "properties": {
+        "Node name for S&R": "PreviewAny",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 6,
+      "type": "JWTFRunTimer",
+      "pos": [
+        440,
+        730
+      ],
+      "size": [
+        420,
+        190
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": " ",
+          "name": "value",
+          "shape": 7,
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": " ",
+          "name": "value",
+          "type": "*",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JWTFRunTimer",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "label": "",
+        "jwtf_run_timer": ""
+      }
+    },
+    {
+      "id": 7,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        360,
+        420
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "How it works",
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "1. Paste the full path of a GIF into the path box. GIF Optimise has its own gif picker for files in the input folder, but the path box lets the compare node see the original too.\n2. GIF Optimise re-encodes it (mode smallest here; try target_size with target_size_mb for a size budget).\n3. GIF Analyse / Compare measures both GIFs and shows them side by side, split or as a difference image. The report gives sizes, frame counts and SSIM and PSNR, so you can see what the saving cost in quality."
+      ],
+      "widgets_values_named": {
+        "text": "1. Paste the full path of a GIF into the path box. GIF Optimise has its own gif picker for files in the input folder, but the path box lets the compare node see the original too.\n2. GIF Optimise re-encodes it (mode smallest here; try target_size with target_size_mb for a size budget).\n3. GIF Analyse / Compare measures both GIFs and shows them side by side, split or as a difference image. The report gives sizes, frame counts and SSIM and PSNR, so you can see what the saving cost in quality."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      4,
+      3,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      3,
+      1,
+      5,
+      0,
+      "STRING"
+    ],
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      1,
+      0,
+      3,
+      2,
+      "STRING"
+    ],
+    [
+      3,
+      2,
+      0,
+      3,
+      3,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Original",
+      "bounding": [
+        20,
+        20,
+        400,
+        700
+      ],
+      "color": "#a1309b",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Optimise",
+      "bounding": [
+        430,
+        20,
+        450,
+        920
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. Compare",
+      "bounding": [
+        890,
+        20,
+        900,
+        730
+      ],
+      "color": "#3f9e5a",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "frontendVersion": "1.58.5",
+    "VHS_latentpreview": true,
+    "VHS_latentpreviewrate": 0
+  },
+  "extensions": {
+    "seed_widgets": {}
+  },
+  "version": 0.4,
+  "seed_widgets": {}
+}

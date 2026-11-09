@@ -11,6 +11,7 @@ import subprocess
 import pytest
 
 from refmod_h3 import upscale_picker as up
+from v3_helpers import legacy, legacy_spec
 
 JS_MATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "js", "refmod_h3", "upscale_math.js"))
 
@@ -96,11 +97,11 @@ def test_grid_rounds_multiple_up_to_16() -> None:
 
 
 def test_node_output_and_ui_payload() -> None:
-    out = up.JWTFH3UpscalePicker().pick(640, 352, "Scale factor", "2x", 2.0, 0.5, 16)
+    out = legacy(up.JWTFH3UpscalePicker.execute(640, 352, "Scale factor", "2x", 2.0, 0.5, 16))
     assert out["result"][:3] == (1280, 704, pytest.approx(2.0))
     ui = out["ui"]["jezzwtf_upscale"][0]
     assert ui == {"sw": 640, "sh": 352, "tw": 1280, "th": 704, "scale": pytest.approx(2.0)}
-    spec = up.JWTFH3UpscalePicker.INPUT_TYPES()["required"]
+    spec = legacy_spec(up.JWTFH3UpscalePicker)["required"]
     assert list(spec) == ["width", "height", "mode", "scale", "custom_scale", "target_megapixels", "multiple"]
     assert spec["scale"][1]["default"] == "2x" and spec["multiple"][1]["step"] == 16
 

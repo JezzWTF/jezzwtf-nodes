@@ -20,8 +20,9 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING
 
+from comfy_api.latest import io
+
 from ._comfy import queue_busy, read_json_object, send_sync
-from ._types import ANY, CATEGORY_UTILS, InputTypes
 
 if TYPE_CHECKING:
     from aiohttp import web
@@ -105,30 +106,34 @@ class TimerRuns:
 RUNS = TimerRuns()
 
 
-class JWTFTimer:
-    CATEGORY = CATEGORY_UTILS
-    OUTPUT_NODE = True
-    RETURN_TYPES: tuple[str, ...] = ()
-    FUNCTION = "run"
+class JWTFTimer(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTimer",
+            display_name='Batch Timer',
+            category='JezzWTF/utils',
+            inputs=[
+                io.Int.Input("total_images", default=1, min=1, max=999999),
+                io.AnyType.Input("trigger", optional=True),
+            ],
+            outputs=[],
+            hidden=[io.Hidden.unique_id],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {"total_images": ("INT", {"default": 1, "min": 1, "max": 999999})},
-            "optional": {"trigger": (ANY, {})},
-            "hidden": {"unique_id": "UNIQUE_ID"},
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, **_: object) -> float:
+    def fingerprint_inputs(cls, **_: object) -> float:
         return float("nan")
 
-    def run(self, total_images: int, trigger: object = None, unique_id: str | None = None) -> tuple[()]:
+    @classmethod
+    def execute(cls, total_images: int, trigger: object = None) -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
         node_id = "" if unique_id is None else str(unique_id)
         run, now = RUNS.tick(node_id, int(total_images))
         send_sync(EVENT, {"node_id": node_id, "current": run.completed, "total": run.total,
                           "started_at": run.started_at, "now": now, "run_id": run.run_id})
-        return ()
+        return io.NodeOutput()
 
 
 def register_routes(routes: "web.RouteTableDef") -> None:
@@ -158,5 +163,4 @@ def register_routes(routes: "web.RouteTableDef") -> None:
         return web.json_response({"status": "ok"})
 
 
-NODE_CLASS_MAPPINGS = {"JWTFTimer": JWTFTimer}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFTimer": "Batch Timer"}
+NODES = [JWTFTimer]

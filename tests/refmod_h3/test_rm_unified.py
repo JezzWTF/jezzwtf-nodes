@@ -11,6 +11,7 @@ from safetensors import safe_open
 from fakes import FakeClip, FakeImageVAE
 from refmod_h3 import unified
 from refmod_h3._types import RefModError
+from v3_helpers import legacy, legacy_spec
 
 CHANNELS = {"qwen21": 64, "fibo2": 128, "flux3": 128}
 
@@ -18,8 +19,8 @@ CHANNELS = {"qwen21": 64, "fibo2": 128, "flux3": 128}
 def bake(refmod_root: str, model: str, name: str = "alice", n: int = 2, resolution: int = 128,
          **kw: object) -> str:
     frames = torch.rand(n, 96, 160, 3)
-    out = unified.JWTFUnifiedRefModBake().bake(model, frames, name, resolution, "", True,
-                                               vae=FakeImageVAE(CHANNELS[model]), **kw)
+    out = legacy(unified.JWTFUnifiedRefModBake.execute(model, frames, name, resolution, "", True,
+                                               vae=FakeImageVAE(CHANNELS[model]), **kw))
     return out["result"][0]
 
 
@@ -85,24 +86,24 @@ def test_encoding_rules() -> None:
 
 
 def test_bake_rules(refmod_root: str) -> None:
-    node = unified.JWTFUnifiedRefModBake()
+    node = unified.JWTFUnifiedRefModBake
     vae = FakeImageVAE(64)
     first = bake(refmod_root, "qwen21")
-    again = node.bake("qwen21", torch.rand(1, 64, 64, 3), "alice", 128, "", False, vae=vae)
+    again = legacy(node.execute("qwen21", torch.rand(1, 64, 64, 3), "alice", 128, "", False, vae=vae))
     assert again["result"] == (first,) and "already exists, skipped" in again["ui"]["text"][0]
     with pytest.raises(RefModError, match="at most 8"):
-        node.bake("fibo2", torch.rand(9, 64, 64, 3), "x", 128, "", True, vae=FakeImageVAE(128))
+        legacy(node.execute("fibo2", torch.rand(9, 64, 64, 3), "x", 128, "", True, vae=FakeImageVAE(128)))
     with pytest.raises(RefModError, match="no reference images"):
-        node.bake("qwen21", torch.zeros(0, 64, 64, 3), "x", 128, "", True, vae=vae)
+        legacy(node.execute("qwen21", torch.zeros(0, 64, 64, 3), "x", 128, "", True, vae=vae))
     with pytest.raises(RefModError, match="VAE"):
-        node.bake("qwen21", torch.rand(1, 64, 64, 3), "x", 128, "", True)
+        legacy(node.execute("qwen21", torch.rand(1, 64, 64, 3), "x", 128, "", True))
     with pytest.raises(RefModError, match="unknown model"):
-        node.bake("nope", torch.rand(1, 64, 64, 3), "x", 128, "", True, vae=vae)
+        legacy(node.execute("nope", torch.rand(1, 64, 64, 3), "x", 128, "", True, vae=vae))
     for bad_sub in ("..", "C:\\x", "/abs"):
         with pytest.raises(RefModError):
-            node.bake("qwen21", torch.rand(1, 64, 64, 3), "x", 128, bad_sub, True, vae=vae)
-    four = node.bake("qwen21", torch.rand(1, 64, 64, 3), "four", 128, "", True, vae=vae,
-                     image_2=torch.rand(1, 64, 64, 3), image_3=torch.rand(2, 64, 64, 3), image_4=None, scale_mode="x")
+            legacy(node.execute("qwen21", torch.rand(1, 64, 64, 3), "x", 128, bad_sub, True, vae=vae))
+    four = legacy(node.execute("qwen21", torch.rand(1, 64, 64, 3), "four", 128, "", True, vae=vae,
+                     image_2=torch.rand(1, 64, 64, 3), image_3=torch.rand(2, 64, 64, 3), image_4=None, scale_mode="x"))
     assert unified.detect(four["result"][0])[1]["count"] == 4
     assert os.path.basename(unified.unified_output_path("a/b:c*", "", unified.HANDLERS["qwen21"])) == "a_b_c_.safetensors"
     with pytest.raises(RefModError, match="empty"):
@@ -148,64 +149,64 @@ def test_index_and_library_payload(refmod_root: str) -> None:
 def test_apply_qwen_schedules_references_by_fraction_of_steps(refmod_root: str) -> None:
     bake(refmod_root, "qwen21", "alice", n=2)
     clip = FakeClip()
-    node = unified.JWTFUnifiedRefModApply()
-    pos, neg, latent = node.apply(unified.AUTO, "qwen21/alice", clip=clip, prompt="a cat", negative_prompt="blur")
+    node = unified.JWTFUnifiedRefModApply
+    pos, neg, latent = legacy(node.execute(unified.AUTO, "qwen21/alice", clip=clip, prompt="a cat", negative_prompt="blur"))
     assert len(pos) == 1 and len(pos[0][1]["reference_latents"]) == 2 and len(neg[0][1]["reference_latents"]) == 2
     assert pos[0][1]["n_images"] == 2  # the text encoder sees the stored images
     assert latent["samples"].shape[1] == 64 and float(latent["samples"].abs().sum()) == 0.0
     assert clip.tokenize_calls[0]["keep_vision"] is False and clip.tokenize_calls[0]["prevent_empty_text"] is True
-    pos, neg, _ = node.apply("qwen21", "qwen21/alice", clip=clip, prompt="a cat", ref_strength=0.4, ref_on_negative=False)
+    pos, neg, _ = legacy(node.execute("qwen21", "qwen21/alice", clip=clip, prompt="a cat", ref_strength=0.4, ref_on_negative=False))
     assert [(p[1].get("start_percent"), p[1].get("end_percent")) for p in pos] == [(0.0, 0.4), (0.4, 1.0)]
     assert "reference_latents" in pos[0][1] and "reference_latents" not in pos[1][1]
     assert "reference_latents" not in neg[0][1]
-    pos, _, _ = node.apply("qwen21", "qwen21/alice", clip=clip, ref_strength=0.0)
+    pos, _, _ = legacy(node.execute("qwen21", "qwen21/alice", clip=clip, ref_strength=0.0))
     assert "reference_latents" not in pos[0][1]
 
 
 def test_apply_flux3_needs_positive_and_keeps_negative_rules(refmod_root: str) -> None:
     bake(refmod_root, "flux3", "f", n=1)
-    node = unified.JWTFUnifiedRefModApply()
+    node = unified.JWTFUnifiedRefModApply
     with pytest.raises(RefModError, match="positive"):
-        node.apply("auto (from refmod)", "flux3/f")
+        legacy(node.execute("auto (from refmod)", "flux3/f"))
     positive = [[torch.zeros(1, 4), {"text": "p"}]]
-    pos, neg, _ = node.apply(unified.AUTO, "flux3/f", positive=positive)
+    pos, neg, _ = legacy(node.execute(unified.AUTO, "flux3/f", positive=positive))
     assert len(pos[0][1]["reference_latents"]) == 1 and neg is pos  # no negative: negative output = positive
     negative = [[torch.zeros(1, 4), {"text": "n"}]]
-    _, neg, _ = node.apply(unified.AUTO, "flux3/f", positive=positive, negative=negative, ref_on_negative=False)
+    _, neg, _ = legacy(node.execute(unified.AUTO, "flux3/f", positive=positive, negative=negative, ref_on_negative=False))
     assert neg is negative
 
 
 def test_apply_error_paths(refmod_root: str) -> None:
     bake(refmod_root, "qwen21", "q", n=1)
     bake(refmod_root, "flux3", "f", n=1)
-    node = unified.JWTFUnifiedRefModApply()
+    node = unified.JWTFUnifiedRefModApply
     positive = [[torch.zeros(1, 4), {}]]
     with pytest.raises(RefModError, match="mixed models"):
-        node.apply(unified.AUTO, "qwen21/q", clip=FakeClip(), refmod_2="flux3/f", positive=positive)
+        legacy(node.execute(unified.AUTO, "qwen21/q", clip=FakeClip(), refmod_2="flux3/f", positive=positive))
     with pytest.raises(RefModError, match="different|model is set to"):
-        node.apply("flux3", "qwen21/q", clip=FakeClip(), positive=positive)
+        legacy(node.execute("flux3", "qwen21/q", clip=FakeClip(), positive=positive))
     with pytest.raises(RefModError, match="choose a model"):
-        node.apply(unified.AUTO, unified.NONE)
+        legacy(node.execute(unified.AUTO, unified.NONE))
     with pytest.raises(RefModError, match="not found"):
-        node.apply(unified.AUTO, "ghost")
+        legacy(node.execute(unified.AUTO, "ghost"))
     with pytest.raises(RefModError, match="needs a CLIP"):
-        node.apply(unified.AUTO, "qwen21/q")
+        legacy(node.execute(unified.AUTO, "qwen21/q"))
     with pytest.raises(RefModError, match="extra_image needs the vae"):
-        node.apply("qwen21", unified.NONE, clip=FakeClip(), extra_image=torch.rand(1, 64, 64, 3))
-    pos, _, latent = node.apply("qwen21", unified.NONE, clip=FakeClip(), extra_image=torch.rand(2, 64, 64, 3),
-                                vae=FakeImageVAE(64), extra_image_resolution=64)
+        legacy(node.execute("qwen21", unified.NONE, clip=FakeClip(), extra_image=torch.rand(1, 64, 64, 3)))
+    pos, _, latent = legacy(node.execute("qwen21", unified.NONE, clip=FakeClip(), extra_image=torch.rand(2, 64, 64, 3),
+                                vae=FakeImageVAE(64), extra_image_resolution=64))
     assert len(pos[0][1]["reference_latents"]) == 2 and latent["samples"].shape[1] == 64
-    empty = node.apply("flux3", unified.NONE, positive=positive)[2]
+    empty = legacy(node.execute("flux3", unified.NONE, positive=positive))[2]
     assert tuple(empty["samples"].shape) == (1, 128, 64, 64)
 
 
 def test_is_changed_uses_file_mtimes(refmod_root: str) -> None:
     path = bake(refmod_root, "qwen21", "q", n=1)
-    key = unified.JWTFUnifiedRefModApply.IS_CHANGED("qwen21/q")
+    key = unified.JWTFUnifiedRefModApply.fingerprint_inputs("qwen21/q")
     assert key == str(os.path.getmtime(path))
-    assert unified.JWTFUnifiedRefModApply.IS_CHANGED("qwen21/q", "ghost") == f"{key}|missing"
-    assert unified.JWTFUnifiedRefModApply.IS_CHANGED() == ""
-    spec = unified.JWTFUnifiedRefModApply.INPUT_TYPES()
+    assert unified.JWTFUnifiedRefModApply.fingerprint_inputs("qwen21/q", "ghost") == f"{key}|missing"
+    assert unified.JWTFUnifiedRefModApply.fingerprint_inputs() == ""
+    spec = legacy_spec(unified.JWTFUnifiedRefModApply)
     assert list(spec["optional"])[-4:] == ["extra_image_resolution", "extra_image_scale", "ref_strength", "ref_on_negative"]
     assert spec["required"]["model"][0][0] == unified.AUTO and json.dumps(spec)
 

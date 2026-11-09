@@ -6,8 +6,9 @@ import re
 
 import torch
 
+from comfy_api.latest import io
+
 from ._comfy import intermediate_device, intermediate_dtype
-from ._types import CATEGORY_UTILS, InputTypes
 
 ASPECT_LABELS = (
     "1:1 (Square)", "5:4 (Large Format)", "4:3 (Standard)", "3:2 (Photo)", "16:10 (Laptop)",
@@ -71,39 +72,41 @@ def compute_resolution(mode: str, aspect_ratio: str, custom_w: float, custom_h: 
     return (h, w) if swap else (w, h)
 
 
-class JWTFResolutionPicker:
-    CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = ("INT", "INT", "LATENT")
-    RETURN_NAMES = ("width", "height", "latent")
-    FUNCTION = "run"
+class JWTFResolutionPicker(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFResolutionPicker",
+            display_name='Resolution Picker',
+            category='JezzWTF/utils',
+            inputs=[
+                io.Combo.Input("mode", options=list(MODES), default='Ratio + Megapixels'),
+                io.Combo.Input("aspect_ratio", options=list(ASPECT_LABELS), default='16:9 (Widescreen)'),
+                io.Float.Input("custom_ratio_w", default=16.0, min=0.1, max=100.0, step=0.01),
+                io.Float.Input("custom_ratio_h", default=9.0, min=0.1, max=100.0, step=0.01),
+                io.Float.Input("megapixels", default=1.0, min=0.05, max=16.0, step=0.05),
+                io.Combo.Input("preset_resolution", options=list(PRESET_LABELS), default='1280x720 (HD 720p)'),
+                io.Boolean.Input("snap_presets", default=True, label_on='snap to multiple', label_off='exact preset'),
+                io.Int.Input("multiple", default=32, min=1, max=256),
+                io.Boolean.Input("swap_orientation", default=False),
+                io.Int.Input("batch_size", default=1, min=1, max=4096),
+            ],
+            outputs=[
+                io.Int.Output("width"),
+                io.Int.Output("height"),
+                io.Latent.Output("latent"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "mode": (list(MODES), {"default": "Ratio + Megapixels"}),
-                "aspect_ratio": (list(ASPECT_LABELS), {"default": "16:9 (Widescreen)"}),
-                "custom_ratio_w": ("FLOAT", {"default": 16.0, "min": 0.1, "max": 100.0, "step": 0.01}),
-                "custom_ratio_h": ("FLOAT", {"default": 9.0, "min": 0.1, "max": 100.0, "step": 0.01}),
-                "megapixels": ("FLOAT", {"default": 1.0, "min": 0.05, "max": 16.0, "step": 0.05}),
-                "preset_resolution": (list(PRESET_LABELS), {"default": "1280x720 (HD 720p)"}),
-                "snap_presets": ("BOOLEAN", {"default": True, "label_on": "snap to multiple",
-                                             "label_off": "exact preset"}),
-                "multiple": ("INT", {"default": 32, "min": 1, "max": 256}),
-                "swap_orientation": ("BOOLEAN", {"default": False}),
-                "batch_size": ("INT", {"default": 1, "min": 1, "max": 4096}),
-            }
-        }
-
-    def run(self, mode: str, aspect_ratio: str, custom_ratio_w: float, custom_ratio_h: float, megapixels: float,
+    def execute(cls, mode: str, aspect_ratio: str, custom_ratio_w: float, custom_ratio_h: float, megapixels: float,
             preset_resolution: str, snap_presets: bool, multiple: int, swap_orientation: bool,
-            batch_size: int) -> tuple[int, int, dict[str, object]]:
+            batch_size: int) -> io.NodeOutput:
         w, h = compute_resolution(mode, aspect_ratio, custom_ratio_w, custom_ratio_h, megapixels,
                                   preset_resolution, snap_presets, multiple, swap_orientation)
         latent = torch.zeros([max(1, batch_size), 4, max(1, h // 8), max(1, w // 8)], device=intermediate_device(),
                              dtype=intermediate_dtype())
-        return (w, h, {"samples": latent, "downscale_ratio_spacial": 8})
+        return io.NodeOutput(w, h, {"samples": latent, "downscale_ratio_spacial": 8})
 
 
-NODE_CLASS_MAPPINGS = {"JWTFResolutionPicker": JWTFResolutionPicker}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFResolutionPicker": "Resolution Picker"}
+NODES = [JWTFResolutionPicker]

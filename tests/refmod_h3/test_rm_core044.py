@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from v3_helpers import legacy
 
 _core_dir = os.environ.get("COMFY_CORE_DIR")
 if _core_dir and os.path.isdir(_core_dir) and _core_dir not in sys.path:
@@ -292,8 +293,8 @@ def test_image_edit_uses_ph3_conditioning_for_the_p_h3_image_vae(monkeypatch: py
     monkeypatch.setattr(image_edit, "ensure_unit_shift", lambda m: m)
     clip, vae = _Clip(), _Ph3Vae()
     img = torch.rand(1, 512, 768, 3)
-    final, native, positive, latent, w, h = image_edit.JWTFH3ImageEdit().run(
-        object(), clip, vae, "make it red", 0, 0, 1, 0, 7, 4, 1.0, "euler", "simple", 1.0, image=img)
+    final, native, positive, latent, w, h = legacy(image_edit.JWTFH3ImageEdit.execute(
+        object(), clip, vae, "make it red", 0, 0, 1, 0, 7, 4, 1.0, "euler", "simple", 1.0, image=img))
     assert clip.prompts == ["Edit <Picture 1>. make it red"]               # core adds the edit prefix
     assert positive[0][1]["minimax_refs"][0]["kind"] == "image"
     assert latent["samples"].is_nested and latent["samples"].unbind()[0].shape[2] == 1   # one picture frame
@@ -321,8 +322,8 @@ def test_image_edit_uses_the_video_conditioning_node_for_other_vaes(monkeypatch:
             assert latent.dim() == 5 and latent.shape[1] == 24
             return torch.zeros(5, latent.shape[3] * 16, latent.shape[4] * 16, 3)
 
-    final, native, positive, latent, w, h = image_edit.JWTFH3ImageEdit().run(
-        object(), _Clip(), VideoVae(), "p", 0, 0, 1, 0, 1, 4, 1.0, "euler", "simple", 1.0, image=torch.rand(1, 256, 256, 3))
+    final, native, positive, latent, w, h = legacy(image_edit.JWTFH3ImageEdit.execute(
+        object(), _Clip(), VideoVae(), "p", 0, 0, 1, 0, 1, 4, 1.0, "euler", "simple", 1.0, image=torch.rand(1, 256, 256, 3)))
     assert requested == [image_edit.CORE_NODE]
     assert positive[0][1]["minimax_keyframes"][0]["resolved_frame_index"] == 0
     assert latent["samples"].is_nested and (w, h) == (256, 256)

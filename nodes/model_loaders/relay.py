@@ -9,7 +9,9 @@ from dataclasses import dataclass
 
 import torch
 
-from ._comfy import CATEGORY_VIDEO, log
+from comfy_api.latest import io
+
+from ._comfy import log
 from .relay_logic import (
     RelayMask,
     RelayOptions,
@@ -147,97 +149,104 @@ def relay_encode(model: object, clip: object, latent: dict[str, object], global_
     return patched, cond
 
 
-def _common_inputs() -> dict[str, tuple[object, ...]]:
-    return {
-        "model": ("MODEL",),
-        "clip": ("CLIP",),
-        "latent": ("LATENT", {"tooltip": "Empty video latent; its shape sets the frame count."}),
-        "global_prompt": ("STRING", {"default": "", "multiline": True}),
-    }
-
-
-EPSILON = ("FLOAT", {"default": 1e-3, "min": 1e-6, "max": 0.99, "step": 1e-4})
-
-
-class JWTFPromptRelayEncode:
-    CATEGORY = CATEGORY_VIDEO
-    RETURN_TYPES = ("MODEL", "CONDITIONING")
-    RETURN_NAMES = ("model", "positive")
-    FUNCTION = "encode"
-    DESCRIPTION = "Global prompt plus time-segmented local prompts; each segment's text dominates its own frames."
+class JWTFPromptRelayEncode(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFPromptRelayEncode",
+            display_name='Prompt Relay Encode',
+            category='JezzWTF/video',
+            description="Global prompt plus time-segmented local prompts; each segment's text dominates its own frames.",
+            inputs=[
+                io.Model.Input("model"),
+                io.Clip.Input("clip"),
+                io.Latent.Input("latent", tooltip='Empty video latent; its shape sets the frame count.'),
+                io.String.Input("global_prompt", default='', multiline=True),
+                io.String.Input("local_prompts", default='', multiline=True, tooltip='Segments separated by |'),
+                io.String.Input("segment_lengths", default='', tooltip='Comma-separated pixel-frame lengths; blank = equal'),
+                io.Float.Input("epsilon", default=0.001, min=1e-06, max=0.99, step=0.0001),
+                io.Custom("RELAY_OPTIONS").Input("relay_options", optional=True),
+            ],
+            outputs=[
+                io.Model.Output("model"),
+                io.Conditioning.Output("positive"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        req = _common_inputs()
-        req["local_prompts"] = ("STRING", {"default": "", "multiline": True, "tooltip": "Segments separated by |"})
-        req["segment_lengths"] = ("STRING", {"default": "", "tooltip": "Comma-separated pixel-frame lengths; blank = equal"})
-        req["epsilon"] = EPSILON
-        return {"required": req, "optional": {"relay_options": (RELAY_OPTIONS,)}}
-
-    def encode(self, model: object, clip: object, latent: dict[str, object], global_prompt: str, local_prompts: str,
+    def execute(cls, model: object, clip: object, latent: dict[str, object], global_prompt: str, local_prompts: str,
                segment_lengths: str, epsilon: float, relay_options: RelayOptions | None = None
-               ) -> tuple[object, list[list[object]]]:
-        return relay_encode(model, clip, latent, global_prompt, local_prompts, segment_lengths, epsilon, relay_options)
+               ) -> io.NodeOutput:
+        return io.NodeOutput(*relay_encode(model, clip, latent, global_prompt, local_prompts, segment_lengths, epsilon, relay_options))
 
 
-class JWTFPromptRelayTimeline:
-    CATEGORY = CATEGORY_VIDEO
-    RETURN_TYPES = ("MODEL", "CONDITIONING")
-    RETURN_NAMES = ("model", "positive")
-    FUNCTION = "encode"
-    DESCRIPTION = "Prompt Relay with a drag-and-drop timeline editor for the segments."
+class JWTFPromptRelayTimeline(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFPromptRelayTimeline",
+            display_name='Prompt Relay Timeline',
+            category='JezzWTF/video',
+            description='Prompt Relay with a drag-and-drop timeline editor for the segments.',
+            inputs=[
+                io.Model.Input("model"),
+                io.Clip.Input("clip"),
+                io.Latent.Input("latent", tooltip='Empty video latent; its shape sets the frame count.'),
+                io.String.Input("global_prompt", default='', multiline=True),
+                io.Int.Input("max_frames", default=129, min=1, max=10000),
+                io.String.Input("timeline_data", default=''),
+                io.String.Input("local_prompts", default='', multiline=True),
+                io.String.Input("segment_lengths", default=''),
+                io.Float.Input("epsilon", default=0.001, min=1e-06, max=0.99, step=0.0001),
+                io.Float.Input("fps", default=24.0, min=0.1, max=240.0, step=0.1, optional=True),
+                io.Combo.Input("time_units", options=['frames', 'seconds'], default='frames', optional=True),
+                io.Custom("RELAY_OPTIONS").Input("relay_options", optional=True),
+            ],
+            outputs=[
+                io.Model.Output("model"),
+                io.Conditioning.Output("positive"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        req = _common_inputs()
-        req["max_frames"] = ("INT", {"default": 129, "min": 1, "max": 10000})
-        req["timeline_data"] = ("STRING", {"default": ""})
-        req["local_prompts"] = ("STRING", {"default": "", "multiline": True})
-        req["segment_lengths"] = ("STRING", {"default": ""})
-        req["epsilon"] = EPSILON
-        return {
-            "required": req,
-            "optional": {
-                "fps": ("FLOAT", {"default": 24.0, "min": 0.1, "max": 240.0, "step": 0.1}),
-                "time_units": (["frames", "seconds"], {"default": "frames"}),
-                "relay_options": (RELAY_OPTIONS,),
-            },
-        }
-
-    def encode(self, model: object, clip: object, latent: dict[str, object], global_prompt: str, max_frames: int,
+    def execute(cls, model: object, clip: object, latent: dict[str, object], global_prompt: str, max_frames: int,
                timeline_data: str, local_prompts: str, segment_lengths: str, epsilon: float, fps: float = 24.0,
                time_units: str = "frames", relay_options: RelayOptions | None = None
-               ) -> tuple[object, list[list[object]]]:
+               ) -> io.NodeOutput:
         parsed = parse_timeline(timeline_data)  # the editor's JSON is the source of truth when present
         if parsed is not None:
             local_prompts = " | ".join(parsed[0])
             segment_lengths = ", ".join(str(n) for n in parsed[1])
-        return relay_encode(model, clip, latent, global_prompt, local_prompts, segment_lengths, epsilon,
-                            relay_options, max_frames=int(max_frames))
+        return io.NodeOutput(*relay_encode(model, clip, latent, global_prompt, local_prompts, segment_lengths, epsilon,
+                                           relay_options, max_frames=int(max_frames)))
 
 
-class JWTFPromptRelayOptions:
-    CATEGORY = CATEGORY_VIDEO
-    RETURN_TYPES = (RELAY_OPTIONS,)
-    RETURN_NAMES = ("relay_options",)
-    FUNCTION = "build"
-    DESCRIPTION = "Experimental strength / window controls for Prompt Relay (video and audio streams)."
+class JWTFPromptRelayOptions(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFPromptRelayOptions",
+            display_name='Prompt Relay Options',
+            category='JezzWTF/video',
+            description='Experimental strength / window controls for Prompt Relay (video and audio streams).',
+            inputs=[
+                io.Float.Input("video_strength", default=1.0, min=0.0, max=10.0, step=0.05),
+                io.Float.Input("video_window_scale", default=1.0, min=0.0, max=4.0, step=0.05),
+                io.Float.Input("audio_epsilon", default=0.0, min=0.0, max=0.99, step=0.0001),
+                io.Float.Input("audio_strength", default=1.0, min=0.0, max=10.0, step=0.05),
+                io.Float.Input("audio_window_scale", default=1.0, min=0.0, max=4.0, step=0.05),
+            ],
+            outputs=[
+                io.Custom("RELAY_OPTIONS").Output("relay_options"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        def f(default: float, hi: float, step: float) -> tuple[object, ...]:
-            return ("FLOAT", {"default": default, "min": 0.0, "max": hi, "step": step})
-        return {"required": {
-            "video_strength": f(1.0, 10.0, 0.05),
-            "video_window_scale": f(1.0, 4.0, 0.05),
-            "audio_epsilon": f(0.0, 0.99, 1e-4),
-            "audio_strength": f(1.0, 10.0, 0.05),
-            "audio_window_scale": f(1.0, 4.0, 0.05),
-        }}
-
-    def build(self, video_strength: float, video_window_scale: float, audio_epsilon: float, audio_strength: float,
-              audio_window_scale: float) -> tuple[RelayOptions]:
-        return (RelayOptions(video_strength=video_strength, video_window_scale=video_window_scale,
+    def execute(cls, video_strength: float, video_window_scale: float, audio_epsilon: float, audio_strength: float,
+              audio_window_scale: float) -> io.NodeOutput:
+        return io.NodeOutput(RelayOptions(video_strength=video_strength, video_window_scale=video_window_scale,
                              audio_epsilon=None if audio_epsilon <= 0 else audio_epsilon,
-                             audio_strength=audio_strength, audio_window_scale=audio_window_scale),)
+                             audio_strength=audio_strength, audio_window_scale=audio_window_scale))
 
+
+NODES = [JWTFPromptRelayEncode, JWTFPromptRelayTimeline, JWTFPromptRelayOptions]

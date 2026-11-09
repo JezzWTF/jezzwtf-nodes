@@ -17,8 +17,9 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from comfy_api.latest import io
+
 from ._comfy import current_prompt_id
-from ._types import ANY, CATEGORY_UTILS, InputTypes
 
 PLACEHOLDER = "select a key..."
 COLORS: tuple[str, ...] = (
@@ -87,58 +88,63 @@ class SetGetStore:
 STORE = SetGetStore()
 
 
-class JWTFSet:
-    CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = (ANY,)
-    RETURN_NAMES = ("pass_through",)
-    FUNCTION = "run"
+class JWTFSet(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFSet",
+            display_name='Set (Remote)',
+            category='JezzWTF/utils',
+            inputs=[
+                io.String.Input("key", default='lora', multiline=False),
+                io.AnyType.Input("value"),
+                io.Combo.Input("color", options=['Default', 'Void', 'Neon', 'Plasma', 'Toxic', 'Flare', 'Blood', 'Quantum', 'Gold', 'Abyss', 'Ghost', 'Rose', 'Matrix', 'Nebula'], default='Default'),
+            ],
+            outputs=[
+                io.AnyType.Output("pass_through"),
+            ],
+            hidden=[io.Hidden.unique_id],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "key": ("STRING", {"default": "lora", "multiline": False}),
-                "value": (ANY, {}),
-                "color": (list(COLORS), {"default": "Default"}),
-            },
-            "hidden": {"unique_id": "UNIQUE_ID"},
-        }
-
-    def run(self, key: str, value: object, color: str = "Default", unique_id: str | None = None) -> tuple[object]:
+    def execute(cls, key: str, value: object, color: str = "Default") -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
         STORE.set(key, value, color, None if unique_id is None else str(unique_id))
-        return (value,)
+        return io.NodeOutput(value)
 
 
-class JWTFGet:
-    CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = (ANY,)
-    RETURN_NAMES = ("value",)
-    FUNCTION = "run"
+class JWTFGet(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFGet",
+            display_name='Get (Remote)',
+            category='JezzWTF/utils',
+            inputs=[
+                io.Combo.Input("key", options=['select a key...']),
+                io.AnyType.Input("set_link", optional=True, extra_dict={'forceInput': True}),
+            ],
+            outputs=[
+                io.AnyType.Output("value"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {"key": ([PLACEHOLDER],)},
-            # Injected by the frontend at prompt time; the socket is hidden in the UI.
-            "optional": {LINK_INPUT: (ANY, {"forceInput": True})},
-        }
-
-    @classmethod
-    def VALIDATE_INPUTS(cls, key: str) -> bool:
+    def validate_inputs(cls, key: str) -> bool:
         # The real key list lives in the frontend; accept any key here.
         return True
 
     @classmethod
-    def IS_CHANGED(cls, key: str, **_: object) -> str:
+    def fingerprint_inputs(cls, key: str, **_: object) -> str:
         # Without a wired set_link the value comes from the global store, so a re-run of the
         # Set (new version) must invalidate this Get's cached output.
         return f"{key}:{STORE.version(key)}"
 
-    def run(self, key: str, **linked: object) -> tuple[object]:
+    @classmethod
+    def execute(cls, key: str, **linked: object) -> io.NodeOutput:
         if LINK_INPUT in linked:
-            return (linked[LINK_INPUT],)
-        return (STORE.get(key),)
+            return io.NodeOutput(linked[LINK_INPUT])
+        return io.NodeOutput(STORE.get(key))
 
 
-NODE_CLASS_MAPPINGS = {"JWTFSet": JWTFSet, "JWTFGet": JWTFGet}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFSet": "Set (Remote)", "JWTFGet": "Get (Remote)"}
+NODES = [JWTFSet, JWTFGet]

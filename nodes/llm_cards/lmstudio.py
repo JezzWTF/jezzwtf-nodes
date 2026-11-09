@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-import io
+from io import BytesIO
 import json
 import os
 import queue
@@ -16,18 +16,9 @@ from typing import Callable, Iterable, Iterator, Mapping, TypedDict
 import numpy as np
 from PIL import Image
 
-from .common import (
-    ANY,
-    CATEGORY_LLM,
-    JSONDict,
-    JSONValue,
-    MAX_IMAGES,
-    encode_jpeg_b64,
-    folder_for_type,
-    frame_to_pil,
-    linspace_indices,
-    send_event,
-)
+from comfy_api.latest import io
+
+from .common import JSONDict, JSONValue, MAX_IMAGES, encode_jpeg_b64, folder_for_type, frame_to_pil, linspace_indices, send_event
 
 EVENT = "jezzwtf.lmstudio.progress"
 DEFAULT_URL = "http://127.0.0.1:1234"
@@ -103,7 +94,7 @@ def wav_bytes(waveform: np.ndarray, sample_rate: int) -> bytes:
     if data.ndim == 1:
         data = data[None, :]
     frames = data.T  # [N, C]
-    buf = io.BytesIO()
+    buf = BytesIO()
     try:
         import soundfile as sf  # type: ignore[import-not-found]
 
@@ -470,46 +461,45 @@ def run_completion(
 # --------------------------------------------------------------------------- nodes
 
 
-class JWTFLMStudio:
-    CATEGORY = CATEGORY_LLM
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("RESPONSE", "PROMPT")
-    FUNCTION = "run"
-    OUTPUT_NODE = True
+class JWTFLMStudio(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLMStudio",
+            display_name='LM Studio Bridge',
+            category='JezzWTF/LLM',
+            inputs=[
+                io.String.Input("server_url", default='http://127.0.0.1:1234', multiline=False),
+                io.String.Input("model_name", default='local-model', multiline=False),
+                io.String.Input("system_prompt", default='You are a helpful assistant. Answer clearly and concisely.', multiline=True, dynamic_prompts=True),
+                io.String.Input("generate_prompt", default='', multiline=True, placeholder='What should the model do?', dynamic_prompts=True),
+                io.Int.Input("max_tokens", default=512, min=-1, max=65536, step=1),
+                io.Float.Input("temperature", default=0.7, min=0.0, max=2.0, step=0.01),
+                io.Float.Input("top_p", default=0.95, min=0.0, max=1.0, step=0.01),
+                io.Boolean.Input("stream", default=True),
+                io.Int.Input("seed", default=0, min=0, max=18446744073709551615),
+                io.Combo.Input("image_size", options=['1024', '768', '512'], default='1024'),
+                io.Int.Input("video_frames", default=8, min=1, max=32),
+                io.Image.Input("image", optional=True),
+                io.Audio.Input("audio", optional=True),
+                io.AnyType.Input("video", optional=True),
+                io.String.Input("prompt_override", optional=True, force_input=True),
+                io.String.Input("embedded_image", default='', optional=True),
+            ],
+            outputs=[
+                io.String.Output("RESPONSE"),
+                io.String.Output("PROMPT"),
+            ],
+            hidden=[io.Hidden.unique_id],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "server_url": ("STRING", {"default": DEFAULT_URL, "multiline": False}),
-                "model_name": ("STRING", {"default": DEFAULT_MODEL, "multiline": False}),
-                "system_prompt": ("STRING", {"default": DEFAULT_SYSTEM, "multiline": True, "dynamicPrompts": True}),
-                "generate_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True,
-                                               "placeholder": "What should the model do?"}),
-                "max_tokens": ("INT", {"default": 512, "min": -1, "max": 65536, "step": 1}),
-                "temperature": ("FLOAT", {"default": 0.70, "min": 0.0, "max": 2.0, "step": 0.01}),
-                "top_p": ("FLOAT", {"default": 0.95, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "stream": ("BOOLEAN", {"default": True}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
-                "image_size": (["1024", "768", "512"], {"default": "1024"}),
-                "video_frames": ("INT", {"default": 8, "min": 1, "max": 32}),
-            },
-            "optional": {
-                "image": ("IMAGE",),
-                "audio": ("AUDIO",),
-                "video": (ANY,),
-                "prompt_override": ("STRING", {"forceInput": True}),
-                "embedded_image": ("STRING", {"default": ""}),
-            },
-            "hidden": {"unique_id": "UNIQUE_ID"},
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, **_kwargs: object) -> float:
+    def fingerprint_inputs(cls, **_kwargs: object) -> float:
         return float("nan")
 
-    def run(
-        self,
+    @classmethod
+    def execute(cls,
         server_url: str,
         model_name: str,
         system_prompt: str,
@@ -526,8 +516,8 @@ class JWTFLMStudio:
         video: object = None,
         prompt_override: str | None = None,
         embedded_image: str = "",
-        unique_id: str | None = None,
-    ) -> dict[str, object]:
+    ) -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
         node = str(unique_id) if unique_id not in (None, "") else "-1"
         user_text = resolve_user_text(prompt_override, generate_prompt)
         max_side = max_side_of(image_size)
@@ -596,12 +586,12 @@ class JWTFLMStudio:
             send_event(EVENT, {"node": node, "state": "error", "tokens": 0, "error": message, "elapsed": elapsed})
             err = f"[LM Studio error] Could not get a reply from {base}: {exc}"
             print(f"{TAG} {err}")
-            return {"ui": {"text": [err]}, "result": (err, user_text)}
+            return io.NodeOutput(err, user_text, ui={"text": [err]})
 
         elapsed = round(time.time() - t0, 2)
         send_event(EVENT, {"node": node, "state": "done", "tokens": tokens, "elapsed": elapsed,
                            "tail": response[-TAIL:]})
-        return {"ui": {"text": [response]}, "result": (response, user_text)}
+        return io.NodeOutput(response, user_text, ui={"text": [response]})
 
 
 PROMPT_BOX_MODES = ["APPEND", "PREPEND", "REPLACE (local wins)", "PASSTHROUGH (incoming wins)"]
@@ -620,27 +610,30 @@ def combine_prompt(mode: str, incoming: str | None, local: str | None, separator
     return inc + separator + loc if inc and loc else (inc or loc)
 
 
-class JWTFLMStudioPromptBox:
-    CATEGORY = CATEGORY_LLM
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("PROMPT_OUT",)
-    FUNCTION = "run"
-    OUTPUT_NODE = True
+class JWTFLMStudioPromptBox(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLMStudioPromptBox",
+            display_name='LM Studio Prompt Box',
+            category='JezzWTF/LLM',
+            description="A prompt box that can combine its text with an incoming prompt: append, prepend, replace, or pass the incoming one through.",
+            inputs=[
+                io.String.Input("text", default='', multiline=True, dynamic_prompts=True),
+                io.Combo.Input("mode", options=PROMPT_BOX_MODES, default='APPEND'),
+                io.String.Input("separator", default='\n\n', multiline=False),
+                io.String.Input("prompt_in", optional=True, force_input=True),
+            ],
+            outputs=[
+                io.String.Output("PROMPT_OUT"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "text": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
-                "mode": (PROMPT_BOX_MODES, {"default": "APPEND"}),
-                "separator": ("STRING", {"default": "\n\n", "multiline": False}),
-            },
-            "optional": {"prompt_in": ("STRING", {"forceInput": True})},
-        }
-
-    def run(self, text: str, mode: str, separator: str, prompt_in: str | None = None) -> dict[str, object]:
+    def execute(cls, text: str, mode: str, separator: str, prompt_in: str | None = None) -> io.NodeOutput:
         out = combine_prompt(mode, prompt_in, text, separator if separator is not None else "")
-        return {"ui": {"text": [out]}, "result": (out,)}
+        return io.NodeOutput(out, ui={"text": [out]})
 
 
 # --------------------------------------------------------------------------- routes
@@ -669,3 +662,6 @@ def register(routes: object) -> None:
 
 
 __all__ = ["JWTFLMStudio", "JWTFLMStudioPromptBox", "combine_prompt", "register"]
+
+
+NODES = [JWTFLMStudio, JWTFLMStudioPromptBox]

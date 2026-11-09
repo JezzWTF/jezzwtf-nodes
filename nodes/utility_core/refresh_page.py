@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, TypedDict
 
 import torch
 
+from comfy_api.latest import io
+
 from ._comfy import prompt_server, read_json_object
-from ._types import ANY, CATEGORY_UTILS, InputTypes
 
 if TYPE_CHECKING:
     from aiohttp import web
@@ -156,33 +157,35 @@ def clean(vram: bool = True, cache: bool = True, node_cache: bool = False, kitch
             "ms": round((time.perf_counter() - t0) * 1000, 1), "notes": notes}
 
 
-class JWTFRefreshPage:
-    CATEGORY = CATEGORY_UTILS
-    OUTPUT_NODE = True
-    RETURN_TYPES = (ANY,)
-    RETURN_NAMES = ("anything",)
-    FUNCTION = "run"
+class JWTFRefreshPage(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRefreshPage",
+            display_name='Refresh Page (VRAM Cleaner)',
+            category='JezzWTF/utils',
+            inputs=[
+                io.Boolean.Input("clean_vram", default=True),
+                io.Boolean.Input("clear_cache", default=True),
+                io.Boolean.Input("clear_node_cache", default=False),
+                io.Combo.Input("kitchen_backend", options=list(KITCHEN_CHOICES), default='leave as is'),
+                io.AnyType.Input("anything", optional=True),
+            ],
+            outputs=[
+                io.AnyType.Output("anything"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "clean_vram": ("BOOLEAN", {"default": True}),
-                "clear_cache": ("BOOLEAN", {"default": True}),
-                "clear_node_cache": ("BOOLEAN", {"default": False}),
-                "kitchen_backend": (list(KITCHEN_CHOICES), {"default": "leave as is"}),
-            },
-            "optional": {"anything": (ANY, {})},
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, **_: object) -> float:
+    def fingerprint_inputs(cls, **_: object) -> float:
         return float("nan")
 
-    def run(self, clean_vram: bool, clear_cache: bool, clear_node_cache: bool, kitchen_backend: str,
-            anything: object = None) -> dict[str, object]:
+    @classmethod
+    def execute(cls, clean_vram: bool, clear_cache: bool, clear_node_cache: bool, kitchen_backend: str,
+            anything: object = None) -> io.NodeOutput:
         stats = clean(clean_vram, clear_cache, clear_node_cache, kitchen_backend)
-        return {"ui": {UI_KEY: [stats]}, "result": (anything,)}
+        return io.NodeOutput(anything, ui={UI_KEY: [stats]})
 
 
 def _queue_busy() -> bool:
@@ -217,5 +220,4 @@ def register_routes(routes: "web.RouteTableDef") -> None:
         return web.json_response(stats)
 
 
-NODE_CLASS_MAPPINGS = {"JWTFRefreshPage": JWTFRefreshPage}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFRefreshPage": "Refresh Page (VRAM Cleaner)"}
+NODES = [JWTFRefreshPage]

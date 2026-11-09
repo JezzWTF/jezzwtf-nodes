@@ -7,6 +7,7 @@ import pytest
 import torch
 
 from refmod_h3 import _comfy, image_edit
+from v3_helpers import legacy
 
 
 def test_seed_is_passed_to_comfy_sample(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -29,5 +30,5 @@ def test_seed_is_passed_to_comfy_sample(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(_comfy, "optional_module", lambda n: fake_sample if n == "comfy.sample" else None)
     monkeypatch.setattr(_comfy, "send_sync", lambda *a, **k: None)
     vae = types.SimpleNamespace(decode=lambda s: torch.rand(1, 8, 8, 3))
-    image_edit.JWTFH3ImageEdit().run(object(), object(), vae, "p", 64, 64, 1, 0, 1234, 4, 1.0, "euler", "simple", 1.0)
+    legacy(image_edit.JWTFH3ImageEdit.execute(object(), object(), vae, "p", 64, 64, 1, 0, 1234, 4, 1.0, "euler", "simple", 1.0))
     assert seen["seed"] == 1234 and seen["denoise"] == 1.0

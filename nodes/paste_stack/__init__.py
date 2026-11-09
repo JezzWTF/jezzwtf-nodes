@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from comfy_api.latest import io
+
 from .routes import register_with_server
 
-NODE_CLASS_MAPPINGS: dict[str, type] = {}
-NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {}
+NODES: list[type[io.ComfyNode]] = []
 
 ROUTES_REGISTERED = register_with_server()
+
+__all__ = ["NODES", "ROUTES_REGISTERED"]

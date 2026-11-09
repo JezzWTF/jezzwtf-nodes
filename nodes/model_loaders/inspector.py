@@ -4,7 +4,9 @@ from __future__ import annotations
 import os
 import time
 
-from ._comfy import CATEGORY_LORA, PACK_DIR, log, lora_full_path, lora_names, send_sync, user_cache_dir
+from comfy_api.latest import io
+
+from ._comfy import PACK_DIR, log, lora_full_path, lora_names, send_sync, user_cache_dir
 from .inspector_logic import InspectorCache, JSONDict, inspect_lora, node_outputs, resolve_api_key
 
 EVENT_PROGRESS = "jezzwtf.lora_inspector.progress"
@@ -46,35 +48,43 @@ def run_inspection(lora: str, source: str, node: str, force: bool, sid: str | No
     return payload
 
 
-class JWTFLoraInspector:
-    CATEGORY = CATEGORY_LORA
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("model_name", "base_model", "trigger_words", "metadata_json")
-    FUNCTION = "inspect"
-    OUTPUT_NODE = True
-    DESCRIPTION = "Identify a LoRA by SHA-256 on Civitai and show base model, trigger words and samples."
+class JWTFLoraInspector(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLoraInspector",
+            display_name='LoRA Inspector',
+            category='JezzWTF/lora',
+            description='Identify a LoRA by SHA-256 on Civitai and show base model, trigger words and samples.',
+            inputs=[
+                io.Combo.Input("lora_name", options=lora_names()),
+                io.Combo.Input("source", options=['auto', 'civitai.com', 'red.civitai.com'], default='auto', optional=True),
+                io.Combo.Input("refresh", options=['use cache', 'force refresh'], default='use cache', optional=True),
+            ],
+            outputs=[
+                io.String.Output("model_name"),
+                io.String.Output("base_model"),
+                io.String.Output("trigger_words"),
+                io.String.Output("metadata_json"),
+            ],
+            hidden=[io.Hidden.unique_id],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        return {
-            "required": {"lora_name": (lora_names(),)},
-            "optional": {
-                "source": (["auto", "civitai.com", "red.civitai.com"], {"default": "auto"}),
-                "refresh": (["use cache", "force refresh"], {"default": "use cache"}),
-            },
-            "hidden": {"unique_id": "UNIQUE_ID"},
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, lora_name: str = "", source: str = "auto", refresh: str = "use cache", **_: object) -> str:
+    def fingerprint_inputs(cls, lora_name: str = "", source: str = "auto", refresh: str = "use cache", **_: object) -> str:
         if refresh == "force refresh":
             return str(time.time())
         return f"{lora_name}|{source}"
 
-    def inspect(self, lora_name: str, source: str = "auto", refresh: str = "use cache",
-                unique_id: str | None = None) -> tuple[str, str, str, str]:
+    @classmethod
+    def execute(cls, lora_name: str, source: str = "auto", refresh: str = "use cache") -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
         node = str(unique_id) if unique_id is not None else "0"
         payload = run_inspection(lora_name, source, node, refresh == "force refresh")
         if payload.get("warning"):
             log.warning("LoRA Inspector: %s", payload["warning"])
-        return node_outputs(payload, lora_name)
+        return io.NodeOutput(*node_outputs(payload, lora_name))
+
+
+NODES = [JWTFLoraInspector]

@@ -9,6 +9,7 @@ import torch
 
 from nodes.llm_cards import bakers, character, character_chat
 from test_llmc_nodes_e2e import comfy_dirs  # noqa: F401  (fixture)
+from v3_helpers import legacy
 
 
 def _card() -> str:
@@ -16,7 +17,7 @@ def _card() -> str:
 
 
 def test_baker_saves_into_characters_folder_by_default(comfy_dirs: types.ModuleType) -> None:  # noqa: F811
-    res = bakers.JWTFV2PNGBaker().bake(torch.rand(1, 16, 24, 3), _card(), "%name%", True)
+    res = legacy(bakers.JWTFV2PNGBaker.execute(torch.rand(1, 16, 24, 3), _card(), "%name%", True))
     path = res["result"][0]  # type: ignore[index]
     assert os.path.dirname(path) == os.path.join(comfy_dirs.get_input_directory(), "characters")
     assert res["ui"]["card_preview"][0]["type"] == "input"  # type: ignore[index]
@@ -26,8 +27,8 @@ def test_baker_saves_into_characters_folder_by_default(comfy_dirs: types.ModuleT
 
 
 def test_baker_can_still_save_to_output(comfy_dirs: types.ModuleType) -> None:  # noqa: F811
-    res = bakers.JWTFV2PNGBaker().bake(torch.rand(1, 16, 24, 3), _card(), "cards/%name%", True,
-                                       save_to=bakers.SAVE_TO_OUTPUT)
+    res = legacy(bakers.JWTFV2PNGBaker.execute(torch.rand(1, 16, 24, 3), _card(), "cards/%name%", True,
+                                       save_to=bakers.SAVE_TO_OUTPUT))
     assert res["ui"]["card_preview"][0]["type"] == "output"  # type: ignore[index]
     assert os.path.abspath(res["result"][0]).startswith(os.path.abspath(comfy_dirs.get_output_directory()))  # type: ignore[index]
 

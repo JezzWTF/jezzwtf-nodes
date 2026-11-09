@@ -10,8 +10,9 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 
+from comfy_api.latest import io
+
 from ._comfy import input_dir
-from ._types import CATEGORY_IMAGE, InputTypes
 
 MAX_SLOTS = 16
 log = logging.getLogger("jezzwtf.utility_core.multi_load")
@@ -92,18 +93,38 @@ def load_rgb(path: str) -> torch.Tensor:
     return torch.from_numpy(arr)[None]
 
 
-class JWTFMultiLoadImage:
-    CATEGORY = CATEGORY_IMAGE
-    RETURN_TYPES = ("IMAGE",) * MAX_SLOTS
-    RETURN_NAMES = tuple(f"image_{i}" for i in range(1, MAX_SLOTS + 1))
-    FUNCTION = "run"
+class JWTFMultiLoadImage(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFMultiLoadImage",
+            display_name='Multi Load Image',
+            category='JezzWTF/image',
+            inputs=[
+                io.String.Input("images_json", default='[]'),
+            ],
+            outputs=[
+                io.Image.Output("image_1"),
+                io.Image.Output("image_2"),
+                io.Image.Output("image_3"),
+                io.Image.Output("image_4"),
+                io.Image.Output("image_5"),
+                io.Image.Output("image_6"),
+                io.Image.Output("image_7"),
+                io.Image.Output("image_8"),
+                io.Image.Output("image_9"),
+                io.Image.Output("image_10"),
+                io.Image.Output("image_11"),
+                io.Image.Output("image_12"),
+                io.Image.Output("image_13"),
+                io.Image.Output("image_14"),
+                io.Image.Output("image_15"),
+                io.Image.Output("image_16"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {"required": {"images_json": ("STRING", {"default": "[]"})}}
-
-    @classmethod
-    def IS_CHANGED(cls, images_json: str = "[]") -> str:
+    def fingerprint_inputs(cls, images_json: str = "[]") -> str:
         h = hashlib.sha256()
         for name in parse_names(images_json):
             h.update(name.encode("utf-8"))
@@ -118,13 +139,14 @@ class JWTFMultiLoadImage:
         return h.hexdigest()
 
     @classmethod
-    def VALIDATE_INPUTS(cls, images_json: str = "[]") -> bool | str:
+    def validate_inputs(cls, images_json: str = "[]") -> bool | str:
         for name in parse_names(images_json):
             if name and not _exists(name):
                 return f"invalid image file: {name}"
         return True
 
-    def run(self, images_json: str = "[]") -> tuple[torch.Tensor, ...]:
+    @classmethod
+    def execute(cls, images_json: str = "[]") -> io.NodeOutput:
         out: list[torch.Tensor] = []
         for i, name in enumerate(parse_names(images_json)):
             if not name:
@@ -137,5 +159,4 @@ class JWTFMultiLoadImage:
         return tuple(out)
 
 
-NODE_CLASS_MAPPINGS = {"JWTFMultiLoadImage": JWTFMultiLoadImage}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFMultiLoadImage": "Multi Load Image"}
+NODES = [JWTFMultiLoadImage]

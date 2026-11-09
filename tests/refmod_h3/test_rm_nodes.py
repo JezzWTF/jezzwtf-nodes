@@ -11,6 +11,7 @@ from fakes import FakeAudioVAE, FakeH3VideoVAE
 from refmod_h3 import bundle, h3_nodes, library, routes
 from refmod_h3._types import RefModError
 from refmod_h3.bundle import RefMod
+from v3_helpers import legacy, legacy_spec
 
 
 def make_bundle(root: str, name: str, t: int = 5, audio_t: int = 0, description: str = "") -> str:
@@ -113,11 +114,11 @@ def test_mod_cache_validates_stamp_and_evicts(refmod_root: str) -> None:
 # --------------------------------------------------------------------------- bake
 
 def test_bake_writes_bundle_sidecars_and_ui(refmod_root: str) -> None:
-    node = h3_nodes.JWTFRefModBake()
+    node = h3_nodes.JWTFRefModBake
     images = torch.rand(2, 400, 360, 3)
     wave = {"waveform": torch.zeros(1, 1, 64000), "sample_rate": 32000}
-    out = node.bake("my char", FakeH3VideoVAE(), images=images, audio=wave, audio_vae=FakeAudioVAE(),
-                    subfolder="characters", description="hello")
+    out = legacy(node.execute("my char", FakeH3VideoVAE(), images=images, audio=wave, audio_vae=FakeAudioVAE(),
+                    subfolder="characters", description="hello"))
     rows, dest, details = out["result"]
     assert dest == os.path.join(refmod_root, "characters", "my char.safetensors") and os.path.isfile(dest)
     assert [m.kind for m, _ in rows] == ["video", "audio"] and all(s == 1.0 for _, s in rows)
@@ -132,46 +133,46 @@ def test_bake_writes_bundle_sidecars_and_ui(refmod_root: str) -> None:
 
 
 def test_bake_validation_errors(refmod_root: str) -> None:
-    node = h3_nodes.JWTFRefModBake()
+    node = h3_nodes.JWTFRefModBake
     vae = FakeH3VideoVAE()
     with pytest.raises(RefModError, match="at least one source"):
-        node.bake("x", vae)
+        legacy(node.execute("x", vae))
     wave = {"waveform": torch.zeros(1, 1, 3200), "sample_rate": 32000}
     with pytest.raises(RefModError, match="audio_vae"):
-        node.bake("x", vae, audio=wave)
-    node.bake("x", vae, images=torch.rand(1, 64, 64, 3))
+        legacy(node.execute("x", vae, audio=wave))
+    legacy(node.execute("x", vae, images=torch.rand(1, 64, 64, 3)))
     with pytest.raises(RefModError, match="already exists"):
-        node.bake("x", vae, images=torch.rand(1, 64, 64, 3), overwrite=False)
-    node.bake("x", vae, images=torch.rand(1, 64, 64, 3), overwrite=True)
+        legacy(node.execute("x", vae, images=torch.rand(1, 64, 64, 3), overwrite=False))
+    legacy(node.execute("x", vae, images=torch.rand(1, 64, 64, 3), overwrite=True))
     with pytest.raises(RefModError):
-        node.bake("../x", vae, images=torch.rand(1, 64, 64, 3), subfolder="..")
+        legacy(node.execute("../x", vae, images=torch.rand(1, 64, 64, 3), subfolder=".."))
 
 
 def test_bake_is_changed_only_depends_on_the_folder(tmp_path: Path) -> None:
     cls = h3_nodes.JWTFRefModBake
-    assert cls.IS_CHANGED("") == "" and cls.IS_CHANGED("   ") == ""
+    assert cls.fingerprint_inputs("") == "" and cls.fingerprint_inputs("   ") == ""
     (tmp_path / "a.png").write_bytes(b"x")
-    key = cls.IS_CHANGED(str(tmp_path), 8)
+    key = cls.fingerprint_inputs(str(tmp_path), 8)
     assert key.startswith("a.png:1:")
 
 
 def test_node_interfaces_match_spec() -> None:
-    bake = h3_nodes.JWTFRefModBake.INPUT_TYPES()
+    bake = legacy_spec(h3_nodes.JWTFRefModBake)
     assert list(bake["required"]) == ["name", "vae"]
     assert bake["optional"]["audio_max_seconds"][1] == {"default": 30.0, "min": 0.025, "max": 600.0, "step": 0.5}
     assert bake["optional"]["max_visual_tokens"][1]["step"] == 512 and bake["optional"]["overwrite"][1]["default"] is True
-    assert h3_nodes.JWTFRefModBake.RETURN_NAMES == ("mods", "saved_path", "details")
+    assert tuple(h3_nodes.JWTFRefModBake.RETURN_NAMES) == ("mods", "saved_path", "details")
     assert h3_nodes.JWTFRefModBake.OUTPUT_NODE is True
-    loader = h3_nodes.JWTFRefModLoader.INPUT_TYPES()
+    loader = legacy_spec(h3_nodes.JWTFRefModLoader)
     assert {"mod_1", "strength_4", "copies_2"} <= set(loader["required"])
     assert {"show_info", "max_total_tokens", "components_3", "visual_strength_1", "audio_strength_4"} <= set(loader["optional"])
-    apply = h3_nodes.JWTFRefModApply.INPUT_TYPES()
+    apply = legacy_spec(h3_nodes.JWTFRefModApply)
     assert apply["required"]["retention"][1]["default"] == 0.85
     assert apply["required"]["curve_value"][1]["default"] == 1.0 and apply["required"]["scramble_seed"][1]["min"] == -1
     assert apply["required"]["components_1"][0] == ["All", "Visual", "Audio"]
     assert list(apply["optional"]) == ["extra_mods"]
     assert apply["required"]["curve_shape"][0][0] == "linear" and len(apply["required"]["curve_shape"][0]) == 11
-    assert h3_nodes.JWTFRefModLoader.VALIDATE_INPUTS() is True
+    assert h3_nodes.JWTFRefModLoader.validate_inputs() is True
 
 
 # --------------------------------------------------------------------------- loader / apply
@@ -188,22 +189,22 @@ def slot_kwargs(**over: object) -> dict[str, object]:
 def test_loader_collects_components_copies_and_hint(refmod_root: str) -> None:
     make_bundle(refmod_root, "alice", t=5, audio_t=40, description="calm")
     make_bundle(refmod_root, "bob", t=1)
-    node = h3_nodes.JWTFRefModLoader()
-    rows, hint, info = node.load(**slot_kwargs(mod_1="alice", copies_1=2, strength_1=0.5, mod_2="bob",
-                                              audio_strength_1=0.0))
+    node = h3_nodes.JWTFRefModLoader
+    rows, hint, info = legacy(node.execute(**slot_kwargs(mod_1="alice", copies_1=2, strength_1=0.5, mod_2="bob",
+                                              audio_strength_1=0.0)))
     assert [(m.kind, s) for m, s in rows] == [("video", 0.5), ("video", 0.5), ("image", 1.0)]  # audio weight 0 skipped
     assert hint == "identity: calm"
     assert "x2" in info and f"total: {2 * 5 * 100 + 100} tokens" in info
-    rows, _, _ = node.load(**slot_kwargs(mod_1="alice", components_1="Audio"))
+    rows, _, _ = legacy(node.execute(**slot_kwargs(mod_1="alice", components_1="Audio")))
     assert [m.kind for m, _ in rows] == ["audio"]
-    rows, _, _ = node.load(**slot_kwargs(mod_1="alice", components_1="Visual", strength_1=0.0))
+    rows, _, _ = legacy(node.execute(**slot_kwargs(mod_1="alice", components_1="Visual", strength_1=0.0)))
     assert rows == []  # master 0 skips the slot entirely
     with pytest.raises(RefModError, match="over the budget"):
-        node.load(max_total_tokens=100, **slot_kwargs(mod_1="alice"))
+        legacy(node.execute(max_total_tokens=100, **slot_kwargs(mod_1="alice")))
     with pytest.raises(RefModError, match="not found"):
-        node.load(**slot_kwargs(mod_1="ghost"))
+        legacy(node.execute(**slot_kwargs(mod_1="ghost")))
     with pytest.raises(RefModError, match="finite number in \\[0, 1\\]"):
-        node.load(**slot_kwargs(mod_1="alice", visual_strength_1=1.5))
+        legacy(node.execute(**slot_kwargs(mod_1="alice", visual_strength_1=1.5)))
 
 
 def test_is_changed_stamps_files_and_flags_missing(refmod_root: str) -> None:
@@ -223,14 +224,14 @@ def cond() -> list[list[object]]:
 def test_apply_injects_blocks_and_merges_extra_mods(refmod_root: str) -> None:
     make_bundle(refmod_root, "alice", t=5, audio_t=40)
     extra = [(RefMod("tail_visual", "image", torch.randn(1, 24, 1, 8, 8).to(torch.float16), description="tail"), 0.5)]
-    out, hint, info = h3_nodes.JWTFRefModApply().apply(cond(), extra_mods=extra, **slot_kwargs(mod_1="alice"))
+    out, hint, info = legacy(h3_nodes.JWTFRefModApply.execute(cond(), extra_mods=extra, **slot_kwargs(mod_1="alice")))
     blocks = out[0][1]["minimax_refs"]
     assert [b["kind"] for b in blocks] == ["video", "audio", "image"] and all(b["refmod"] for b in blocks)
     assert hint == "identity: tail" and "(extra) tail_visual" in info and "injected 3 reference block(s)" in info
-    same, _, _ = h3_nodes.JWTFRefModApply().apply(cond(), **slot_kwargs())
+    same, _, _ = legacy(h3_nodes.JWTFRefModApply.execute(cond(), **slot_kwargs()))
     assert same[0][1]["minimax_refs"] == []  # no rows: unchanged
     with pytest.raises(RefModError, match="over the budget"):
-        h3_nodes.JWTFRefModApply().apply(cond(), max_total_tokens=10, extra_mods=extra, **slot_kwargs())
+        legacy(h3_nodes.JWTFRefModApply.execute(cond(), max_total_tokens=10, extra_mods=extra, **slot_kwargs()))
 
 
 def test_apply_scramble_seed_is_reproducible(refmod_root: str) -> None:
@@ -239,8 +240,8 @@ def test_apply_scramble_seed_is_reproducible(refmod_root: str) -> None:
     kw = slot_kwargs(mod_1="a", mod_2="b", mod_3="c", mod_4="d")
     sizes = []
     for _ in range(2):
-        out, _, _ = h3_nodes.JWTFRefModApply().apply(cond(), scramble_seed=3, scramble_mode="subset",
-                                                    scramble_keep=2, **kw)
+        out, _, _ = legacy(h3_nodes.JWTFRefModApply.execute(cond(), scramble_seed=3, scramble_mode="subset",
+                                                    scramble_keep=2, **kw))
         sizes.append([b["latent"].float().sum().item() for b in out[0][1]["minimax_refs"]])
     assert len(sizes[0]) == 2 and sizes[0] == sizes[1]
 
@@ -262,24 +263,24 @@ def test_tail_frame_selection_follows_the_h3_grid() -> None:
 def test_tail_capture_alternates_slots_and_load_reads_newest(refmod_root: str) -> None:
     vae = FakeH3VideoVAE()
     frames = torch.rand(30, 64, 64, 3)
-    capture, load = h3_nodes.JWTFTailCapture(), h3_nodes.JWTFTailLoad()
-    assert load.run(True, 1.0)[0] == [] and "no tail saved" in load.run(True, 1.0)[1]
-    assert load.run(False, 1.0) == ([], "tail off")
+    capture, load = h3_nodes.JWTFTailCapture, h3_nodes.JWTFTailLoad
+    assert legacy(load.execute(True, 1.0))[0] == [] and "no tail saved" in legacy(load.execute(True, 1.0))[1]
+    assert legacy(load.execute(False, 1.0)) == ([], "tail off")
     written = []
     for _ in range(3):
-        res = capture.run(frames, vae, 1.0, 24.0)
+        res = legacy(capture.execute(frames, vae, 1.0, 24.0))
         assert "tail saved" in res["ui"]["text"][0]
         newest = h3_nodes.newest_slot("tail_latest")
         written.append(os.path.basename(newest))
     assert written[0] != written[1] and written[0] == written[2]  # a/b alternate, never the newest file
-    rows, info = load.run(True, 0.5)
+    rows, info = legacy(load.execute(True, 0.5))
     assert [s for _, s in rows] == [0.5] and rows[0][0].path.endswith(written[-1])
-    assert load.IS_CHANGED(True, 0.5).startswith("True|0.5|")
-    assert load.IS_CHANGED(True, 0.5) != load.IS_CHANGED(False, 0.5)
+    assert load.fingerprint_inputs(True, 0.5).startswith("True|0.5|")
+    assert load.fingerprint_inputs(True, 0.5) != load.fingerprint_inputs(False, 0.5)
 
 
 def test_tail_refmod_saves_and_scales_strength(refmod_root: str) -> None:
-    mods, info, frames = h3_nodes.JWTFTailRefMod().run(torch.rand(30, 64, 64, 3), FakeH3VideoVAE(), 1.0, 24.0, 0.4)
+    mods, info, frames = legacy(h3_nodes.JWTFTailRefMod.execute(torch.rand(30, 64, 64, 3), FakeH3VideoVAE(), 1.0, 24.0, 0.4))
     assert os.path.isfile(os.path.join(refmod_root, "_tail", "tail_latest.safetensors"))
     assert [s for _, s in mods] == [0.4] and frames.shape[0] == 22
     assert mods[0][0].latent.shape[2] == 22  # tails keep their grid length (the original collapsed them to 5)

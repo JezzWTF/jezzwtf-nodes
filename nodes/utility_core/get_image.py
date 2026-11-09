@@ -8,8 +8,10 @@ import numpy as np
 import torch
 from PIL import Image
 
+from comfy_api.latest import io
+
 from ._comfy import temp_dir
-from ._types import CATEGORY_IMAGE, InputTypes, UIPayload
+from ._types import UIPayload
 
 MASK_MODES = ("Alpha Channel", "Luminance", "Blank")
 UI_KEY = "jezzwtf_get_image"
@@ -37,26 +39,29 @@ def _save_png(arr: np.ndarray, path: str) -> None:
     Image.fromarray(arr).save(path, compress_level=1)
 
 
-class JWTFGetImage:
-    CATEGORY = CATEGORY_IMAGE
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("IMAGE", "MASK")
-    FUNCTION = "run"
+class JWTFGetImage(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFGetImage",
+            display_name='Get Image',
+            category='JezzWTF/image',
+            inputs=[
+                io.Image.Input("image"),
+                io.Boolean.Input("invert_mask", default=False, optional=True),
+                io.Float.Input("mask_threshold", default=0.0, min=0.0, max=1.0, step=0.01, optional=True),
+                io.Combo.Input("mask_mode", options=list(MASK_MODES), default='Alpha Channel', optional=True),
+            ],
+            outputs=[
+                io.Image.Output("IMAGE"),
+                io.Mask.Output("MASK"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {"image": ("IMAGE",)},
-            "optional": {
-                "invert_mask": ("BOOLEAN", {"default": False}),
-                "mask_threshold": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "mask_mode": (list(MASK_MODES), {"default": "Alpha Channel"}),
-            },
-        }
-
-    def run(self, image: torch.Tensor, invert_mask: bool = False, mask_threshold: float = 0.0,
-            mask_mode: str = "Alpha Channel") -> dict[str, object]:
+    def execute(cls, image: torch.Tensor, invert_mask: bool = False, mask_threshold: float = 0.0,
+            mask_mode: str = "Alpha Channel") -> io.NodeOutput:
         mask = compute_mask(image, mask_mode, mask_threshold, invert_mask)
         rgb = image[..., :3]
         out_dir = temp_dir()
@@ -72,8 +77,7 @@ class JWTFGetImage:
         except Exception:
             entries = []
         ui: UIPayload = {UI_KEY: list(entries)}
-        return {"ui": ui, "result": (rgb, mask)}
+        return io.NodeOutput(rgb, mask, ui=ui)
 
 
-NODE_CLASS_MAPPINGS = {"JWTFGetImage": JWTFGetImage}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFGetImage": "Get Image"}
+NODES = [JWTFGetImage]

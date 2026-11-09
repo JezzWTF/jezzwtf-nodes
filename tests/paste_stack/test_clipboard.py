@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from aiohttp.test_utils import make_mocked_request
 
-from paste_stack import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS, clipboard, routes
+from paste_stack import NODES, clipboard, routes
 
 MB = 1024 * 1024
 
@@ -19,8 +19,7 @@ MB = 1024 * 1024
 
 
 def test_package_adds_no_nodes() -> None:
-    assert NODE_CLASS_MAPPINGS == {}
-    assert NODE_DISPLAY_NAME_MAPPINGS == {}
+    assert NODES == []
 
 
 # ------------------------------------------------------------------ caller checks

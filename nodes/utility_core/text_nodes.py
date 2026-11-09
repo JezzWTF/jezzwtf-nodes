@@ -6,7 +6,8 @@ from typing import Protocol
 
 import torch
 
-from ._types import CATEGORY_CONDITIONING, CATEGORY_UTILS, InputTypes
+from comfy_api.latest import io
+
 
 CondItem = list[object]  # [tensor, meta dict]
 Conditioning = list[CondItem]
@@ -18,22 +19,28 @@ class ClipLike(Protocol):
     def encode_from_tokens_scheduled(self, tokens: object) -> Conditioning: ...
 
 
-class JWTFTextBox:
-    CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("TEXT",)
-    FUNCTION = "run"
+class JWTFTextBox(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTextBox",
+            display_name='Text Box',
+            category='JezzWTF/utils',
+            inputs=[
+                io.String.Input("text", default='', multiline=True),
+            ],
+            outputs=[
+                io.String.Output("TEXT"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {"required": {"text": ("STRING", {"multiline": True, "default": ""})}}
-
-    @classmethod
-    def IS_CHANGED(cls, text: str = "") -> str:
+    def fingerprint_inputs(cls, text: str = "") -> str:
         return text
 
-    def run(self, text: str) -> tuple[str]:
-        return (text,)
+    @classmethod
+    def execute(cls, text: str) -> io.NodeOutput:
+        return io.NodeOutput(text)
 
 
 def zero_out(cond: Sequence[Sequence[object]]) -> Conditioning:
@@ -54,64 +61,70 @@ def zero_out(cond: Sequence[Sequence[object]]) -> Conditioning:
     return out
 
 
-class JWTFTextEncodeZeroNeg:
-    CATEGORY = CATEGORY_CONDITIONING
-    RETURN_TYPES = ("CONDITIONING", "CONDITIONING")
-    RETURN_NAMES = ("POSITIVE", "NEGATIVE")
-    FUNCTION = "run"
+class JWTFTextEncodeZeroNeg(io.ComfyNode):
     MODES = ("Zero Out", "Empty String")
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "clip": ("CLIP",),
-                "positive": ("STRING", {"multiline": True, "default": ""}),
-                "negative_mode": (list(cls.MODES), {"default": "Zero Out"}),
-            }
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTextEncodeZeroNeg",
+            display_name='Text Encode (Zero Negative)',
+            category='JezzWTF/conditioning',
+            inputs=[
+                io.Clip.Input("clip"),
+                io.String.Input("positive", default='', multiline=True),
+                io.Combo.Input("negative_mode", options=list(cls.MODES), default=cls.MODES[0]),
+            ],
+            outputs=[
+                io.Conditioning.Output("POSITIVE"),
+                io.Conditioning.Output("NEGATIVE"),
+            ],
+        )
 
-    def run(self, clip: ClipLike, positive: str, negative_mode: str) -> tuple[Conditioning, Conditioning]:
+    @classmethod
+    def execute(cls, clip: ClipLike, positive: str, negative_mode: str) -> io.NodeOutput:
         pos = clip.encode_from_tokens_scheduled(clip.tokenize(positive))
         if negative_mode == "Empty String":
             neg = clip.encode_from_tokens_scheduled(clip.tokenize(""))
         else:
             neg = zero_out(pos)
-        return (pos, neg)
+        return io.NodeOutput(pos, neg)
 
 
 TITLE_STYLES = ("Solid", "Gradient", "Neon", "Rainbow", "Outline", "Chrome")
 TITLE_ANIMATIONS = ("None", "Pulse", "Float", "Shimmer", "Rainbow Shift", "Glow Pulse")
 
 
-class JWTFTitleFont:
-    CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("TEXT",)
-    FUNCTION = "run"
+class JWTFTitleFont(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTitleFont",
+            display_name='Title Font',
+            category='JezzWTF/utils',
+            inputs=[
+                io.String.Input("text", default='TITLE', multiline=False),
+                io.Int.Input("font_size", default=56, min=8, max=240, step=1),
+                io.Boolean.Input("bold", default=True),
+                io.Boolean.Input("glow", default=True),
+                io.Combo.Input("style", options=list(TITLE_STYLES), default='Gradient'),
+                io.String.Input("color_a", default='#ff3d7f'),
+                io.String.Input("color_b", default='#3da5ff'),
+                io.Combo.Input("animate", options=list(TITLE_ANIMATIONS), default='None'),
+                io.String.Input("url", default=''),
+            ],
+            outputs=[
+                io.String.Output("TEXT"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "text": ("STRING", {"default": "TITLE", "multiline": False}),
-                "font_size": ("INT", {"default": 56, "min": 8, "max": 240, "step": 1}),
-                "bold": ("BOOLEAN", {"default": True}),
-                "glow": ("BOOLEAN", {"default": True}),
-                "style": (list(TITLE_STYLES), {"default": "Gradient"}),
-                "color_a": ("STRING", {"default": "#ff3d7f"}),
-                "color_b": ("STRING", {"default": "#3da5ff"}),
-                "animate": (list(TITLE_ANIMATIONS), {"default": "None"}),
-                "url": ("STRING", {"default": ""}),
-            }
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, text: str = "", **_: object) -> str:
+    def fingerprint_inputs(cls, text: str = "", **_: object) -> str:
         return text
 
-    def run(self, text: str, **_: object) -> tuple[str]:
-        return (text,)
+    @classmethod
+    def execute(cls, text: str, **_: object) -> io.NodeOutput:
+        return io.NodeOutput(text)
 
 
 DEFAULT_INSTRUCTION = "Change the [subject] into [new subject]."
@@ -131,40 +144,28 @@ def build_edit_prompt(instruction: str, enable_suffix: bool = True, suffix: str 
     return out
 
 
-class JWTFEditPromptTemplate:
-    CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("prompt",)
-    FUNCTION = "run"
+class JWTFEditPromptTemplate(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFEditPromptTemplate",
+            display_name='Edit Prompt Template',
+            category='JezzWTF/utils',
+            inputs=[
+                io.String.Input("edit_instruction", default='Change the [subject] into [new subject].', multiline=True, dynamic_prompts=True),
+                io.Boolean.Input("enable_suffix", default=True, optional=True),
+                io.String.Input("suffix", default='Leave everything else as it is: the composition, the lighting, the art style, every facial expression and the background must not change.', multiline=True, optional=True),
+                io.Combo.Input("separator", options=list(SEPARATORS), default='newline', optional=True),
+            ],
+            outputs=[
+                io.String.Output("prompt"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "edit_instruction": ("STRING", {"multiline": True, "dynamicPrompts": True,
-                                                "default": DEFAULT_INSTRUCTION}),
-            },
-            "optional": {
-                "enable_suffix": ("BOOLEAN", {"default": True}),
-                "suffix": ("STRING", {"multiline": True, "default": DEFAULT_SUFFIX}),
-                "separator": (list(SEPARATORS), {"default": "newline"}),
-            },
-        }
-
-    def run(self, edit_instruction: str, enable_suffix: bool = True, suffix: str | None = None,
-            separator: str = "newline") -> tuple[str]:
-        return (build_edit_prompt(edit_instruction, enable_suffix, suffix, separator),)
+    def execute(cls, edit_instruction: str, enable_suffix: bool = True, suffix: str | None = None,
+            separator: str = "newline") -> io.NodeOutput:
+        return io.NodeOutput(build_edit_prompt(edit_instruction, enable_suffix, suffix, separator))
 
 
-NODE_CLASS_MAPPINGS = {
-    "JWTFTextBox": JWTFTextBox,
-    "JWTFTextEncodeZeroNeg": JWTFTextEncodeZeroNeg,
-    "JWTFTitleFont": JWTFTitleFont,
-    "JWTFEditPromptTemplate": JWTFEditPromptTemplate,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "JWTFTextBox": "Text Box",
-    "JWTFTextEncodeZeroNeg": "Text Encode (Zero Negative)",
-    "JWTFTitleFont": "Title Font",
-    "JWTFEditPromptTemplate": "Edit Prompt Template",
-}
+NODES = [JWTFTextBox, JWTFTextEncodeZeroNeg, JWTFTitleFont, JWTFEditPromptTemplate]

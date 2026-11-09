@@ -8,6 +8,7 @@ import torch
 import utility_core.get_image as gi
 from utility_core.get_image import JWTFGetImage
 from utility_core.text_nodes import Conditioning, JWTFEditPromptTemplate, JWTFTextEncodeZeroNeg
+from v3_helpers import legacy, overrides
 
 
 class FakeClip:
@@ -25,7 +26,7 @@ class FakeClip:
 
 def test_text_encode_zero_out() -> None:
     clip = FakeClip()
-    pos, neg = JWTFTextEncodeZeroNeg().run(clip, "a cat", "Zero Out")
+    pos, neg = legacy(JWTFTextEncodeZeroNeg.execute(clip, "a cat", "Zero Out"))
     assert clip.tokenized == ["a cat"]
     assert torch.count_nonzero(pos[0][0]) == 6
     assert torch.count_nonzero(neg[0][0]) == 0 and torch.count_nonzero(neg[0][1]["pooled_output"]) == 0
@@ -34,30 +35,30 @@ def test_text_encode_zero_out() -> None:
 
 def test_text_encode_empty_string_mode_encodes_blank() -> None:
     clip = FakeClip()
-    _, neg = JWTFTextEncodeZeroNeg().run(clip, "a cat", "Empty String")
+    _, neg = legacy(JWTFTextEncodeZeroNeg.execute(clip, "a cat", "Empty String"))
     assert clip.tokenized == ["a cat", ""]
     assert torch.count_nonzero(neg[0][0]) == 0
 
 
 def test_text_encode_node_shape() -> None:
-    assert JWTFTextEncodeZeroNeg.RETURN_NAMES == ("POSITIVE", "NEGATIVE")
-    modes = JWTFTextEncodeZeroNeg.INPUT_TYPES()["required"]["negative_mode"][0]
+    assert tuple(JWTFTextEncodeZeroNeg.RETURN_NAMES) == ("POSITIVE", "NEGATIVE")
+    modes = JWTFTextEncodeZeroNeg.INPUT_TYPES()["required"]["negative_mode"][1]["options"]
     assert modes == ["Zero Out", "Empty String"]
-    assert not hasattr(JWTFTextEncodeZeroNeg, "IS_CHANGED")
+    assert not overrides(JWTFTextEncodeZeroNeg, "fingerprint_inputs")
 
 
 def test_edit_prompt_node_defaults() -> None:
     spec = JWTFEditPromptTemplate.INPUT_TYPES()
     assert spec["required"]["edit_instruction"][1]["dynamicPrompts"] is True
-    assert spec["optional"]["separator"][0] == ["newline", "space", "comma"]
-    (out,) = JWTFEditPromptTemplate().run("  swap the hat  ", enable_suffix=False)
+    assert spec["optional"]["separator"][1]["options"] == ["newline", "space", "comma"]
+    (out,) = legacy(JWTFEditPromptTemplate.execute("  swap the hat  ", enable_suffix=False))
     assert out == "swap the hat"
 
 
 def test_get_image_run_writes_two_previews(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(gi, "temp_dir", lambda: str(tmp_path))
     img = torch.rand(2, 8, 6, 4)
-    out = JWTFGetImage().run(img, mask_mode="Alpha Channel")
+    out = legacy(JWTFGetImage.execute(img, mask_mode="Alpha Channel"))
     rgb, mask = out["result"]
     assert rgb.shape == (2, 8, 6, 3) and mask.shape == (2, 8, 6)
     assert torch.allclose(mask, 1.0 - img[..., 3])

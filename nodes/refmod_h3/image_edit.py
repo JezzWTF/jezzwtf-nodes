@@ -6,8 +6,10 @@ import math
 
 import torch
 
+from comfy_api.latest import io
+
 from . import _comfy
-from ._types import CATEGORY_REFMOD, InputTypes, RefModError
+from ._types import RefModError
 
 log = logging.getLogger("jezzwtf.refmod_h3")
 
@@ -92,49 +94,53 @@ def _call_core(cls: type, **kwargs: object) -> tuple[object, dict[str, torch.Ten
     return positive, latent  # type: ignore[return-value]
 
 
-class JWTFH3ImageEdit:
-    CATEGORY = CATEGORY_REFMOD
-    RETURN_TYPES = ("IMAGE", "IMAGE", "CONDITIONING", "LATENT", "INT", "INT")
-    RETURN_NAMES = ("image", "native_res", "positive", "latent", "width", "height")
-    FUNCTION = "run"
+class JWTFH3ImageEdit(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFH3ImageEdit",
+            display_name='MiniMax H3 Image Edit',
+            category='JezzWTF/refmod',
+            inputs=[
+                io.Model.Input("model"),
+                io.Clip.Input("clip"),
+                io.Vae.Input("vae"),
+                io.String.Input("prompt", multiline=True, dynamic_prompts=True),
+                io.Int.Input("width", default=0, min=0, max=8192, step=8),
+                io.Int.Input("height", default=0, min=0, max=8192, step=8),
+                io.Int.Input("frame_length", default=1, min=1, max=257),
+                io.Int.Input("batch_index", default=0, min=0, max=256),
+                io.Int.Input("seed", default=0, min=0, max=18446744073709551615),
+                io.Int.Input("steps", default=20, min=1, max=150),
+                io.Float.Input("cfg", default=1.0, min=0.0, max=100.0, step=0.1),
+                io.Combo.Input("sampler_name", options=_sampler_lists()[0]),
+                io.Combo.Input("scheduler", options=_sampler_lists()[1]),
+                io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01),
+                io.Image.Input("image", optional=True),
+                io.Image.Input("last_frame", optional=True),
+                io.Float.Input("megapixels", default=1.0, min=0.1, max=8.0, step=0.01, optional=True),
+                io.Combo.Input("resize_back_method", options=list(RESIZE_METHODS), default='lanczos', optional=True),
+            ],
+            outputs=[
+                io.Image.Output("image"),
+                io.Image.Output("native_res"),
+                io.Conditioning.Output("positive"),
+                io.Latent.Output("latent"),
+                io.Int.Output("width"),
+                io.Int.Output("height"),
+            ],
+            hidden=[io.Hidden.unique_id],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        samplers, schedulers = _sampler_lists()
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "clip": ("CLIP",),
-                "vae": ("VAE",),
-                "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-                "width": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 8}),
-                "height": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 8}),
-                "frame_length": ("INT", {"default": 1, "min": 1, "max": 257}),
-                "batch_index": ("INT", {"default": 0, "min": 0, "max": 256}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 2 ** 64 - 1}),
-                "steps": ("INT", {"default": 20, "min": 1, "max": 150}),
-                "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step": 0.1}),
-                "sampler_name": (samplers,),
-                "scheduler": (schedulers,),
-                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-            },
-            "optional": {
-                "image": ("IMAGE",),
-                "last_frame": ("IMAGE",),
-                "megapixels": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 8.0, "step": 0.01}),
-                "resize_back_method": (list(RESIZE_METHODS), {"default": "lanczos"}),
-            },
-            "hidden": {"prompt_id": "PROMPT_ID"},
-        }
-
-    def run(self, model: object, clip: object, vae: object, prompt: str, width: int, height: int,
+    def execute(cls, model: object, clip: object, vae: object, prompt: str, width: int, height: int,
             frame_length: int, batch_index: int, seed: int, steps: int, cfg: float, sampler_name: str,
             scheduler: str, denoise: float, image: torch.Tensor | None = None,
             last_frame: torch.Tensor | None = None, megapixels: float = 1.0,
-            resize_back_method: str = "lanczos", prompt_id: str | None = None
-            ) -> tuple[torch.Tensor, torch.Tensor, object, dict[str, torch.Tensor], int, int]:
+            resize_back_method: str = "lanczos") -> io.NodeOutput:
+        node_id = cls.hidden.unique_id
         def progress(pct: int, stage: str) -> None:
-            _comfy.send_sync(PROGRESS_EVENT, {"percent": pct, "stage": stage, "prompt_id": prompt_id})
+            _comfy.send_sync(PROGRESS_EVENT, {"percent": pct, "stage": stage, "node": None if node_id is None else str(node_id)})
 
         ph3 = is_ph3_image_vae(vae)
         core = _core_node_class(PH3_NODE if ph3 else CORE_NODE)
@@ -208,8 +214,7 @@ class JWTFH3ImageEdit:
             if (ow, oh) != (int(native.shape[2]), int(native.shape[1])):
                 final = _comfy.common_upscale(native.movedim(-1, 1), ow, oh, resize_back_method, "center").movedim(1, -1)
         progress(100, "done")
-        return final.clamp(0, 1), native, positive, out_latent, int(final.shape[2]), int(final.shape[1])
+        return io.NodeOutput(final.clamp(0, 1), native, positive, out_latent, int(final.shape[2]), int(final.shape[1]))
 
 
-NODE_CLASS_MAPPINGS = {"JWTFH3ImageEdit": JWTFH3ImageEdit}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFH3ImageEdit": "MiniMax H3 Image Edit"}
+NODES = [JWTFH3ImageEdit]

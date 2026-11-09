@@ -10,10 +10,12 @@ import numpy as np
 import pytest
 import refmod_h3
 import torch
+from comfy_api.latest import io
 from PIL import Image
 
 from refmod_h3 import curves, preview
 from refmod_h3 import _comfy
+from v3_helpers import legacy_spec
 
 CURVE_JS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "js", "refmod_h3", "curve_math.js"))
 EXPECTED = {
@@ -26,23 +28,27 @@ EXPECTED = {
 }
 
 
+def _schemas() -> dict[str, io.Schema]:
+    return {s.node_id: s for s in (n.GET_SCHEMA() for n in refmod_h3.NODES)}
+
+
 def test_mappings_cover_the_whole_family() -> None:
-    assert refmod_h3.NODE_DISPLAY_NAME_MAPPINGS == EXPECTED
-    assert set(refmod_h3.NODE_CLASS_MAPPINGS) == set(EXPECTED)
+    schemas = _schemas()
+    assert {k: s.display_name for k, s in schemas.items()} == EXPECTED
+    assert len(refmod_h3.NODES) == len(EXPECTED)
 
 
 def test_naming_conventions_and_interfaces() -> None:
-    for key, cls in refmod_h3.NODE_CLASS_MAPPINGS.items():
+    for node in refmod_h3.NODES:
+        schema = node.GET_SCHEMA()
+        key = schema.node_id
         assert key.startswith("JWTF")
-        name = refmod_h3.NODE_DISPLAY_NAME_MAPPINGS[key]
+        name = schema.display_name
         assert name.isascii() and name == name.strip(), f"{key}: display name must be plain text"
-        assert cls.CATEGORY in ("JezzWTF/refmod", "JezzWTF/sampling", "JezzWTF/loaders"), key
-        spec = cls.INPUT_TYPES()  # type: ignore[attr-defined]
+        assert schema.category in ("JezzWTF/refmod", "JezzWTF/sampling", "JezzWTF/loaders"), key
+        spec = legacy_spec(node)
         assert set(spec) <= {"required", "optional", "hidden"} and "required" in spec or key.endswith("Capture")
-        types_ = cls.RETURN_TYPES
-        names = getattr(cls, "RETURN_NAMES", None)
-        assert names is None or len(names) == len(types_), key
-        assert callable(getattr(cls, cls.FUNCTION)), key
+        assert len(node.RETURN_TYPES) == len(node.RETURN_NAMES), key
         for section in ("required", "optional"):
             for field, entry in spec.get(section, {}).items():
                 assert isinstance(entry, tuple) and entry, f"{key}.{field}"
@@ -50,7 +56,7 @@ def test_naming_conventions_and_interfaces() -> None:
 
 
 def test_categories() -> None:
-    cats = {k: c.CATEGORY for k, c in refmod_h3.NODE_CLASS_MAPPINGS.items()}
+    cats = {s.node_id: s.category for s in _schemas().values()}
     assert cats["JWTFUltimateKSampler"] == cats["JWTFH3KSampler"] == "JezzWTF/sampling"
     assert cats["JWTFUltimateModelLoader"] == "JezzWTF/loaders" and cats["JWTFRefModApply"] == "JezzWTF/refmod"
 

@@ -6,8 +6,8 @@ section is preserved byte for byte (header-only rewrite).
 """
 from __future__ import annotations
 
+from io import BytesIO
 import base64
-import io
 import json
 import logging
 import os
@@ -19,8 +19,10 @@ import numpy as np
 import torch
 from PIL import Image
 
+from comfy_api.latest import io
+
 from . import _comfy, library
-from ._types import CATEGORY_REFMOD, InputTypes, JSONDict, JSONValue, RefModError
+from ._types import JSONDict, JSONValue, RefModError
 from .bundle import read_header
 from .cards import card_info, parse_card, safe_name
 
@@ -172,7 +174,7 @@ def avatar_png_b64(image: torch.Tensor, max_size: int) -> tuple[str, bytes]:
     if max(im.size) > max_size:
         s = max_size / max(im.size)
         im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
-    buf = io.BytesIO()
+    buf = BytesIO()
     im.save(buf, format="PNG", optimize=True)
     data = buf.getvalue()
     return base64.b64encode(data).decode("ascii"), data
@@ -250,36 +252,35 @@ def _clean_path(v: str | None) -> str:
 
 # --------------------------------------------------------------------------- node
 
-class JWTFRefmodCardBaker:
-    CATEGORY = CATEGORY_REFMOD
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("saved_path", "character_name")
-    FUNCTION = "bake"
-    OUTPUT_NODE = True
+class JWTFRefmodCardBaker(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRefmodCardBaker",
+            display_name='Refmod Character Card Baker',
+            category='JezzWTF/refmod',
+            inputs=[
+                io.Image.Input("image"),
+                io.String.Input("json_text", multiline=True, force_input=True),
+                io.String.Input("filename_prefix", default='%name%'),
+                io.Combo.Input("base_refmod", options=base_choices(), default='(none - character-only file)'),
+                io.Int.Input("avatar_max_size", default=512, min=64, max=2048, step=16),
+                io.Boolean.Input("fill_missing_fields", default=True, label_on='fill missing V2 fields', label_off='keep JSON exactly as pasted'),
+                io.String.Input("system_prompt", multiline=True, optional=True, force_input=True),
+                io.String.Input("base_refmod_path", default='', optional=True),
+                io.Combo.Input("save_to", options=[SAVE_TO_REFMODS, SAVE_TO_OUTPUT], default='refmods folder', optional=True),
+            ],
+            outputs=[
+                io.String.Output("saved_path"),
+                io.String.Output("character_name"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        choices = base_choices()
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "json_text": ("STRING", {"multiline": True, "forceInput": True}),
-                "filename_prefix": ("STRING", {"default": "%name%"}),
-                "base_refmod": (choices, {"default": NONE_CHOICE}),
-                "avatar_max_size": ("INT", {"default": 512, "min": 64, "max": 2048, "step": 16}),
-                "fill_missing_fields": ("BOOLEAN", {"default": True, "label_on": "fill missing V2 fields",
-                                                    "label_off": "keep JSON exactly as pasted"}),
-            },
-            "optional": {
-                "system_prompt": ("STRING", {"multiline": True, "forceInput": True}),
-                "base_refmod_path": ("STRING", {"default": ""}),
-                "save_to": ([SAVE_TO_REFMODS, SAVE_TO_OUTPUT], {"default": SAVE_TO_REFMODS}),
-            },
-        }
-
-    def bake(self, image: torch.Tensor, json_text: str, filename_prefix: str, base_refmod: str,
+    def execute(cls, image: torch.Tensor, json_text: str, filename_prefix: str, base_refmod: str,
              avatar_max_size: int, fill_missing_fields: bool, system_prompt: str | None = None,
-             base_refmod_path: str = "", save_to: str = SAVE_TO_REFMODS) -> dict[str, object]:
+             base_refmod_path: str = "", save_to: str = SAVE_TO_REFMODS) -> io.NodeOutput:
         card, notes = parse_card(json_text, bool(fill_missing_fields))
         data = card["data"]
         assert isinstance(data, dict)
@@ -319,10 +320,8 @@ class JWTFRefmodCardBaker:
             "bytes": os.path.getsize(dst), "saved": os.path.relpath(dst, out_root).replace("\\", "/"),
             "base": os.path.basename(src) if src else "",
         }
-        return {"ui": {"card_preview": [{"filename": temp_name, "subfolder": "", "type": "temp"}],
-                       "card_info": [info]},
-                "result": (dst, name)}
+        return io.NodeOutput(dst, name, ui={"card_preview": [{"filename": temp_name, "subfolder": "", "type": "temp"}],
+                       "card_info": [info]})
 
 
-NODE_CLASS_MAPPINGS = {"JWTFRefmodCardBaker": JWTFRefmodCardBaker}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFRefmodCardBaker": "Refmod Character Card Baker"}
+NODES = [JWTFRefmodCardBaker]

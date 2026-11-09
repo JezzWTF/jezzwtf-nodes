@@ -8,7 +8,9 @@ from collections.abc import Callable, Mapping
 
 import torch
 
-from ._comfy import CATEGORY_LORA, folder_roots, log, lora_full_path
+from comfy_api.latest import io
+
+from ._comfy import folder_roots, log, lora_full_path
 from .lora_stack_logic import (
     StateDictCache,
     applied_summary,
@@ -55,51 +57,56 @@ def _lora_roots() -> list[str]:
     return folder_roots("loras")
 
 
-class JWTFLoraStack:
-    CATEGORY = CATEGORY_LORA
-    RETURN_TYPES = ("MODEL", "CLIP")
-    RETURN_NAMES = ("MODEL", "CLIP")
-    FUNCTION = "apply"
-    DESCRIPTION = "Apply a stack of LoRAs from models/loras, edited as a visual list."
+class JWTFLoraStack(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLoraStack",
+            display_name='LoRA Stack',
+            category='JezzWTF/lora',
+            description='Apply a stack of LoRAs from models/loras, edited as a visual list.',
+            inputs=[
+                io.Model.Input("model"),
+                io.String.Input("lora_data", default='{}', multiline=False),
+                io.Clip.Input("clip", optional=True),
+            ],
+            outputs=[
+                io.Model.Output("MODEL"),
+                io.Clip.Output("CLIP"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "lora_data": ("STRING", {"default": "{}", "multiline": False}),
-            },
-            "optional": {"clip": ("CLIP",)},
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, lora_data: str = "{}", **_: object) -> str:
+    def fingerprint_inputs(cls, lora_data: str = "{}", **_: object) -> str:
         return _mtime_signature(str(lora_data), lora_full_path)
 
-    def apply(self, model: object, lora_data: str, clip: object | None = None) -> tuple[object, object | None]:
+    @classmethod
+    def execute(cls, model: object, lora_data: str, clip: object | None = None) -> io.NodeOutput:
         m, c, applied = apply_lora_stack(model, clip, lora_data, lora_full_path)
         log.info("JWTFLoraStack applied: %s", applied)
-        return (m, c)
+        return io.NodeOutput(m, c)
 
 
-class JWTFLoraFolderStack:
-    CATEGORY = CATEGORY_LORA
-    RETURN_TYPES: tuple[str, ...] = ("MODEL", "CLIP", "STRING")
-    RETURN_NAMES: tuple[str, ...] = ("MODEL", "CLIP", "applied")
-    FUNCTION = "apply"
-    DESCRIPTION = "Apply LoRAs picked from one subfolder of models/loras, each with its own on/off and strength."
-
+class JWTFLoraFolderStack(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "folder": ("STRING", {"default": "", "multiline": False,
-                                      "tooltip": "Subfolder of models/loras (blank = the root folder itself)."}),
-                "lora_data": ("STRING", {"default": "{}", "multiline": False}),
-            },
-            "optional": {"clip": ("CLIP",)},
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLoraFolderStack",
+            display_name='LoRA Folder Stack',
+            category='JezzWTF/lora',
+            description='Apply LoRAs picked from one subfolder of models/loras, each with its own on/off and strength.',
+            inputs=[
+                io.Model.Input("model"),
+                io.String.Input("folder", default='', multiline=False, tooltip='Subfolder of models/loras (blank = the root folder itself).'),
+                io.String.Input("lora_data", default='{}', multiline=False),
+                io.Clip.Input("clip", optional=True),
+            ],
+            outputs=[
+                io.Model.Output("MODEL"),
+                io.Clip.Output("CLIP"),
+                io.String.Output("applied"),
+            ],
+        )
 
     @staticmethod
     def _resolver(folder: str) -> Callable[[str], str | None]:
@@ -107,37 +114,59 @@ class JWTFLoraFolderStack:
         return lambda name: resolve_in_folder(files, name)
 
     @classmethod
-    def IS_CHANGED(cls, folder: str = "", lora_data: str = "{}", **_: object) -> str:
+    def fingerprint_inputs(cls, folder: str = "", lora_data: str = "{}", **_: object) -> str:
         try:
             return f"{folder}|" + _mtime_signature(str(lora_data), cls._resolver(str(folder)))
         except ValueError as exc:
             return f"invalid:{exc}"
 
-    def apply(self, model: object, folder: str, lora_data: str,
-              clip: object | None = None) -> tuple[object, ...]:
-        resolve = self._resolver(folder)
+    @classmethod
+    def execute(cls, model: object, folder: str, lora_data: str,
+                clip: object | None = None) -> io.NodeOutput:
+        resolve = cls._resolver(folder)
         m, c, applied = apply_lora_stack(model, clip, lora_data, resolve)
-        return (m, c, applied)
+        return io.NodeOutput(m, c, applied)
 
 
 class JWTFLoraFolderStackMulti(JWTFLoraFolderStack):
-    RETURN_TYPES = ("MODEL", "CLIP", "STRING") + ("MODEL",) * EXTRA_MODELS
-    RETURN_NAMES = ("MODEL", "CLIP", "applied") + tuple(f"MODEL {i}" for i in range(2, 2 + EXTRA_MODELS))
-    DESCRIPTION = "Folder LoRA stack applied to up to five models (CLIP only on the first)."
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLoraFolderStackMulti",
+            display_name='LoRA Folder Stack (Multi-Model)',
+            category='JezzWTF/lora',
+            description='Folder LoRA stack applied to up to five models (CLIP only on the first).',
+            inputs=[
+                io.Model.Input("model"),
+                io.String.Input("folder", default='', multiline=False, tooltip='Subfolder of models/loras (blank = the root folder itself).'),
+                io.String.Input("lora_data", default='{}', multiline=False),
+                io.Clip.Input("clip", optional=True),
+                io.Model.Input("model_2", optional=True),
+                io.Model.Input("model_3", optional=True),
+                io.Model.Input("model_4", optional=True),
+                io.Model.Input("model_5", optional=True),
+            ],
+            outputs=[
+                io.Model.Output("MODEL"),
+                io.Clip.Output("CLIP"),
+                io.String.Output("applied"),
+                io.Model.Output("MODEL 2"),
+                io.Model.Output("MODEL 3"),
+                io.Model.Output("MODEL 4"),
+                io.Model.Output("MODEL 5"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        spec = super().INPUT_TYPES()
-        for i in range(2, 2 + EXTRA_MODELS):
-            spec["optional"][f"model_{i}"] = ("MODEL",)
-        return spec
-
-    def apply(self, model: object, folder: str, lora_data: str,  # type: ignore[override]
-              clip: object | None = None, **extra: object) -> tuple[object, ...]:
-        resolve = self._resolver(folder)
+    def execute(cls, model: object, folder: str, lora_data: str,  # type: ignore[override]
+                clip: object | None = None, **extra: object) -> io.NodeOutput:
+        resolve = cls._resolver(folder)
         m, c, applied = apply_lora_stack(model, clip, lora_data, resolve)
         outs: list[object] = [m, c, applied]
         for i in range(2, 2 + EXTRA_MODELS):
             other = extra.get(f"model_{i}")
             outs.append(apply_lora_stack(other, None, lora_data, resolve)[0] if other is not None else None)
-        return tuple(outs)
+        return io.NodeOutput(*outs)
+
+
+NODES = [JWTFLoraStack, JWTFLoraFolderStack, JWTFLoraFolderStackMulti]

@@ -5,6 +5,7 @@ import pytest
 
 from refmod_h3 import ultimate_loader as ul
 from refmod_h3._types import RefModError
+from v3_helpers import legacy, legacy_spec
 
 
 def registry(*names: str):
@@ -37,7 +38,7 @@ def test_backend_probes_alternate_names_and_warns_when_nothing_registered() -> N
 
 
 def test_kitchen_defaults_on_and_loses_to_any_higher_switch() -> None:
-    spec = ul.JWTFUltimateModelLoader.INPUT_TYPES()["required"]
+    spec = legacy_spec(ul.JWTFUltimateModelLoader)["required"]
     assert spec["kitchen"][1]["default"] is True
     assert all(spec[k][1]["default"] is False for k in ("sage2", "sage3", "triton", "flash2", "pytorch", "sparse", "vsa"))
     reg = registry("comfy_kitchen_int8", "sage")
@@ -47,7 +48,7 @@ def test_kitchen_defaults_on_and_loses_to_any_higher_switch() -> None:
 
 def test_interface_matches_spec() -> None:
     cls = ul.JWTFUltimateModelLoader
-    spec = cls.INPUT_TYPES()
+    spec = legacy_spec(cls)
     req = spec["required"]
     assert list(req)[:3] == ["model_name", "quant_format", "model_type"]
     assert list(req)[-5:] == ["heading_model", "heading_engine", "heading_clips", "heading_vaes", "section_order"]
@@ -58,9 +59,9 @@ def test_interface_matches_spec() -> None:
     assert req["kitchen"][1]["label_on"] == req["kitchen"][1]["label_off"] == "kitchen"
     assert req["clip1_device"][0] == ["default", "cpu"] and req["clip2_enabled"][1]["default"] is False
     assert spec["hidden"] == {"unique_id": "UNIQUE_ID"}
-    assert cls.RETURN_TYPES == ("MODEL", "CLIP", "CLIP", "VAE", "VAE")
-    assert cls.RETURN_NAMES == ("MODEL", "CLIP (main)", "CLIP (enhancer)", "VAE (video/default)", "VAE (audio)")
-    assert cls.CATEGORY == "JezzWTF/loaders" and cls.VALIDATE_INPUTS() is True
+    assert tuple(cls.RETURN_TYPES) == ("MODEL", "CLIP", "CLIP", "VAE", "VAE")
+    assert tuple(cls.RETURN_NAMES) == ("MODEL", "CLIP (main)", "CLIP (enhancer)", "VAE (video/default)", "VAE (audio)")
+    assert cls.CATEGORY == "JezzWTF/loaders" and cls.validate_inputs() is True
     assert req["quant_format"][0][:2] == ["auto", "bf16"]
 
 
@@ -70,7 +71,7 @@ def test_sparse_and_vsa_together_is_an_error() -> None:
               clip1_device="default", clip2_enabled=False, clip2_name="c", clip2_type="auto", clip2_device="default",
               vae_name="v", audio_vae_enabled=False, audio_vae_name="v")
     with pytest.raises(RefModError, match="sparse and vsa"):
-        ul.JWTFUltimateModelLoader().load(**kw)
+        legacy(ul.JWTFUltimateModelLoader.execute(**kw))
 
 
 def test_sparse_attention_degrades_with_a_clear_error_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:

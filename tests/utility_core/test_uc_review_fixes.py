@@ -26,6 +26,7 @@ from utility_core.folder_utils import caption_target
 from utility_core.multi_load import JWTFMultiLoadImage
 from utility_core.set_get import SetGetStore
 from utility_core.text_nodes import zero_out
+from v3_helpers import legacy
 
 Handler = Callable[..., Awaitable[object]]
 
@@ -224,14 +225,14 @@ def test_multi_load_blocks_path_traversal(tmp_path: Path, monkeypatch: pytest.Mo
     (inp / "ok.png").write_bytes(b"fine")
     monkeypatch.setitem(sys.modules, "folder_paths", _fake_folder_paths(inp, out, tmp_path / "temp"))
     evil = json.dumps(["../secret.png"])
-    assert JWTFMultiLoadImage.VALIDATE_INPUTS(evil) != True  # noqa: E712
+    assert JWTFMultiLoadImage.validate_inputs(evil) != True  # noqa: E712
     with pytest.raises(ValueError, match="outside"):
-        JWTFMultiLoadImage().run(evil)
-    assert JWTFMultiLoadImage.VALIDATE_INPUTS(json.dumps(["ok.png"])) is True
-    ok_hash = JWTFMultiLoadImage.IS_CHANGED(json.dumps(["ok.png"]))
+        legacy(JWTFMultiLoadImage.execute(evil))
+    assert JWTFMultiLoadImage.validate_inputs(json.dumps(["ok.png"])) is True
+    ok_hash = JWTFMultiLoadImage.fingerprint_inputs(json.dumps(["ok.png"]))
     (tmp_path / "secret.png").write_bytes(b"changed")
-    assert JWTFMultiLoadImage.IS_CHANGED(evil) == JWTFMultiLoadImage.IS_CHANGED(evil)  # never reads the file
-    assert JWTFMultiLoadImage.IS_CHANGED(json.dumps(["ok.png"])) == ok_hash
+    assert JWTFMultiLoadImage.fingerprint_inputs(evil) == JWTFMultiLoadImage.fingerprint_inputs(evil)  # never reads the file
+    assert JWTFMultiLoadImage.fingerprint_inputs(json.dumps(["ok.png"])) == ok_hash
 
 
 def test_multi_load_hash_is_chunked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -256,7 +257,7 @@ def test_multi_load_hash_is_chunked(tmp_path: Path, monkeypatch: pytest.MonkeyPa
             self.fh.close()  # type: ignore[attr-defined]
 
     monkeypatch.setattr(ml, "open", lambda p, m="r": Spy(real_open(p, m)), raising=False)
-    JWTFMultiLoadImage.IS_CHANGED(json.dumps(["big.png"]))
+    JWTFMultiLoadImage.fingerprint_inputs(json.dumps(["big.png"]))
     assert sizes and all(0 < n <= (1 << 20) for n in sizes)
 
 
@@ -264,8 +265,8 @@ def test_multi_load_hash_is_chunked(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
 def test_resolution_latent_uses_intermediate_dtype(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(res, "intermediate_dtype", lambda: torch.float16)
-    _, _, latent = res.JWTFResolutionPicker().run("Preset Resolution", "1:1 (Square)", 1, 1, 1,
-                                                  "640x360 (16:9 nHD)", False, 32, False, 1)
+    _, _, latent = legacy(res.JWTFResolutionPicker.execute("Preset Resolution", "1:1 (Square)", 1, 1, 1,
+                                                  "640x360 (16:9 nHD)", False, 32, False, 1))
     samples = latent["samples"]
     assert isinstance(samples, torch.Tensor) and samples.dtype == torch.float16
 

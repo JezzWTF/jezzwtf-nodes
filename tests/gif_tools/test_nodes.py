@@ -15,6 +15,7 @@ from gif_tools.nodes import JWTFFramesToAnimated, JWTFGifCompare, JWTFGifOptimis
 
 import synth
 from synth import needs_ffmpeg
+from v3_helpers import legacy, legacy_spec
 
 
 @pytest.fixture
@@ -33,15 +34,15 @@ def as_tensor(clip: F.Clip) -> torch.Tensor:
 
 
 def test_node_registration_and_schema() -> None:
-    assert set(nodes.NODE_CLASS_MAPPINGS) == {"JWTFVideoToGif", "JWTFGifOptimise", "JWTFGifCompare", "JWTFLoadGif", "JWTFFramesToAnimated"}
-    for cls in nodes.NODE_CLASS_MAPPINGS.values():
-        assert cls.CATEGORY == "JezzWTF/gif"
-        spec = cls.INPUT_TYPES()
-        assert "required" in spec
+    schemas = {n.GET_SCHEMA().node_id: n.GET_SCHEMA() for n in nodes.NODES}
+    assert set(schemas) == {"JWTFVideoToGif", "JWTFGifOptimise", "JWTFGifCompare", "JWTFLoadGif", "JWTFFramesToAnimated"}
+    for cls in nodes.NODES:
+        assert cls.GET_SCHEMA().category == "JezzWTF/gif"
+        assert "required" in legacy_spec(cls)
         assert len(cls.RETURN_TYPES) == len(cls.RETURN_NAMES)
-    opt = JWTFVideoToGif.INPUT_TYPES()["optional"]
-    assert {"images", "video", "mode"} <= set(opt) | set(JWTFVideoToGif.INPUT_TYPES()["required"])
-    assert nodes.NODE_DISPLAY_NAME_MAPPINGS["JWTFVideoToGif"] == "Video to GIF (Optimised)"
+    spec = legacy_spec(JWTFVideoToGif)
+    assert {"images", "video", "mode"} <= set(spec["optional"]) | set(spec["required"])
+    assert schemas["JWTFVideoToGif"].display_name == "Video to GIF (Optimised)"
 
 
 def test_tensor_frame_round_trip_and_channel_handling() -> None:
@@ -62,7 +63,7 @@ def test_loop_count_mapping() -> None:
 @needs_ffmpeg
 def test_video_to_gif_from_images_saves_where_the_prefix_says(dirs: dict[str, str]) -> None:
     clip = synth.motion_clip(12)
-    out = JWTFVideoToGif().run("balanced", "my clip/ünï", images=as_tensor(clip), source_fps=20.0, fps=10.0, max_width=96, compare_naive=True)
+    out = legacy(JWTFVideoToGif.execute("balanced", "my clip/ünï", images=as_tensor(clip), source_fps=20.0, fps=10.0, max_width=96, compare_naive=True))
     path, preview, report = out["result"]
     assert path.startswith(os.path.realpath(dirs["output"])) or path.startswith(dirs["output"])
     assert os.path.basename(path) == "ünï_00001.gif" and os.path.dirname(path).endswith("my clip") and "gifs" not in path
@@ -72,16 +73,16 @@ def test_video_to_gif_from_images_saves_where_the_prefix_says(dirs: dict[str, st
     assert "SSIM" in report and "naive" in report
     entry = out["ui"]["jwtf_gif"][0]
     assert entry["subfolder"] == "my clip" and entry["filename"] == "ünï_00001.gif" and entry["stats"]["bytes"] == os.path.getsize(path)
-    again = JWTFVideoToGif().run("balanced", "my clip/ünï", images=as_tensor(clip), fps=10.0, max_width=96, compare_naive=False)
+    again = legacy(JWTFVideoToGif.execute("balanced", "my clip/ünï", images=as_tensor(clip), fps=10.0, max_width=96, compare_naive=False))
     assert os.path.basename(again["result"][0]) == "ünï_00002.gif"
 
 
 @needs_ffmpeg
 def test_video_to_gif_warns_about_uneven_cadence_and_clamps(dirs: dict[str, str]) -> None:
     clip = synth.motion_clip(10, fps=60)
-    out = JWTFVideoToGif().run("quality", "cad", images=as_tensor(clip), source_fps=60.0, fps=30.0, dither="none", palette="global_full", compare_naive=False)
+    out = legacy(JWTFVideoToGif.execute("quality", "cad", images=as_tensor(clip), source_fps=60.0, fps=30.0, dither="none", palette="global_full", compare_naive=False))
     assert "not a whole number of 10 ms" in out["result"][2]
-    out = JWTFVideoToGif().run("quality", "cad", images=as_tensor(clip), source_fps=60.0, fps=0.0, dither="none", palette="global_full", compare_naive=False)
+    out = legacy(JWTFVideoToGif.execute("quality", "cad", images=as_tensor(clip), source_fps=60.0, fps=0.0, dither="none", palette="global_full", compare_naive=False))
     assert "50 fps" in out["result"][2]
     delays = gifio.read_delays_cs(open(out["result"][0], "rb").read())
     assert min(delays) >= 2
@@ -90,16 +91,16 @@ def test_video_to_gif_warns_about_uneven_cadence_and_clamps(dirs: dict[str, str]
 def test_video_to_gif_input_and_validation_errors(dirs: dict[str, str]) -> None:
     node = JWTFVideoToGif()
     with pytest.raises(ValueError, match="IMAGE batch or a VIDEO"):
-        node.run("balanced", "x")
+        legacy(node.execute("balanced", "x"))
     imgs = torch.rand(3, 16, 16, 3)
     for bad in ({"fps": float("nan")}, {"speed": 0.0}, {"colors": 7}, {"dither": "x; y"}, {"crop_left": -1}, {"trim_start": float("inf")}, {"mode": "nope"}):
         kwargs = {"mode": "balanced", "filename_prefix": "x", "images": imgs, **bad}
         mode = kwargs.pop("mode")
         prefix = kwargs.pop("filename_prefix")
         with pytest.raises(ValueError):
-            node.run(mode, prefix, **kwargs)
+            legacy(node.execute(mode, prefix, **kwargs))
     with pytest.raises(ValueError):
-        node.run("balanced", "../../escape", images=imgs)
+        legacy(node.execute("balanced", "../../escape", images=imgs))
     assert not os.path.exists(os.path.join(dirs["output"], "..", "escape_00001.gif"))
 
 
@@ -109,10 +110,10 @@ def test_gif_optimise_round_trip_and_load_gif(dirs: dict[str, str]) -> None:
     src = gifio.encode_with_pillow(clip.frames, [5] * 30, 256, "none", 0)
     with open(os.path.join(dirs["input"], "ünï src.gif"), "wb") as fh:
         fh.write(src)
-    out = JWTFGifOptimise().run("ünï src.gif", "smallest", "opt", palette="global_full", dither="sierra2_4a", compare_naive=False)
+    out = legacy(JWTFGifOptimise.execute("ünï src.gif", "smallest", "opt", palette="global_full", dither="sierra2_4a", compare_naive=False))
     path, preview, report = out["result"]
     assert "source GIF" in report and "% saved" in report
-    loaded = JWTFLoadGif().run("ünï src.gif")
+    loaded = legacy(JWTFLoadGif.execute("ünï src.gif"))
     assert loaded[3] == 30 and loaded[0].shape[0] == 30 and loaded[1].shape[0] == 30
     assert loaded[2] == pytest.approx(20.0, rel=0.01)
     assert json.loads(loaded[4]) == [50] * 30
@@ -120,25 +121,25 @@ def test_gif_optimise_round_trip_and_load_gif(dirs: dict[str, str]) -> None:
     assert JWTFLoadGif.RETURN_NAMES[-1] == "gif_path"
     assert float(loaded[1].max()) == 0.0  # opaque GIF: mask is all 0
     # the optimised GIF is loadable by path (outside the input folder, inside output)
-    again = JWTFLoadGif().run("", path=path)
+    again = legacy(JWTFLoadGif.execute("", path=path))
     assert again[3] == preview.shape[0]
     with pytest.raises(ValueError):
-        JWTFLoadGif().run("", path=os.path.join(dirs["input"], "..", "..", "windows", "x.gif"))
+        legacy(JWTFLoadGif.execute("", path=os.path.join(dirs["input"], "..", "..", "windows", "x.gif")))
 
 
 def test_optimise_accepts_a_wired_path_with_the_placeholder_picker(dirs: dict[str, str]) -> None:
     """A shared workflow keeps the picker at its placeholder value; that must validate and not be needed."""
     from gif_tools.nodes import USE_PATH
 
-    assert JWTFGifOptimise.INPUT_TYPES()["required"]["gif"][0][0] == USE_PATH
+    assert legacy_spec(JWTFGifOptimise)["required"]["gif"][0][0] == USE_PATH
     clip = synth.motion_clip(10)
     path = os.path.join(dirs["input"], "p.gif")
     with open(path, "wb") as fh:
         fh.write(gifio.encode_with_pillow(clip.frames, [5] * 10, 64, "none", 0))
-    out = JWTFGifOptimise().run(USE_PATH, "smallest", "opt", path=path, compare_naive=False)
+    out = legacy(JWTFGifOptimise.execute(USE_PATH, "smallest", "opt", path=path, compare_naive=False))
     assert out["result"][0].endswith(".gif")
     with pytest.raises(ValueError, match="connect a path"):
-        JWTFGifOptimise().run(USE_PATH, "smallest", "opt", compare_naive=False)
+        legacy(JWTFGifOptimise.execute(USE_PATH, "smallest", "opt", compare_naive=False))
 
 
 def test_load_gif_mask_from_transparency(dirs: dict[str, str]) -> None:
@@ -150,7 +151,7 @@ def test_load_gif_mask_from_transparency(dirs: dict[str, str]) -> None:
     other[5:10, 20:25] = (30, 200, 30, 255)
     path = os.path.join(dirs["input"], "t.gif")
     Image.fromarray(rgba, "RGBA").save(path, save_all=True, append_images=[Image.fromarray(other, "RGBA")], duration=[100, 100], loop=0, disposal=2)
-    images, mask, fps, count, delays, gif_path = JWTFLoadGif().run("t.gif")
+    images, mask, fps, count, delays, gif_path = legacy(JWTFLoadGif.execute("t.gif"))
     assert gif_path == os.path.abspath(path)
     assert count == 2 and mask.shape == (2, 20, 30)
     assert float(mask[0, 0, 0]) == 1.0 and float(mask[0, 0, 29]) == 0.0
@@ -164,19 +165,19 @@ def test_compare_node_reports_and_composes(dirs: dict[str, str]) -> None:
     node = JWTFGifCompare()
     img_a, img_good, img_bad = as_tensor(clip), as_tensor(good), as_tensor(bad)
     for layout, width in (("side_by_side", 320), ("split", 160), ("difference", 160)):
-        tensor, text = node.run(layout, images_a=img_a, images_b=img_good, output_frames=5)["result"]
+        tensor, text = legacy(node.execute(layout, images_a=img_a, images_b=img_good, output_frames=5))["result"]
         assert tensor.shape == (5, 120, width, 3)
-    _, text_good = node.run("split", images_a=img_a, images_b=img_good)["result"]
-    _, text_bad = node.run("split", images_a=img_a, images_b=img_bad)["result"]
+    _, text_good = legacy(node.execute("split", images_a=img_a, images_b=img_good))["result"]
+    _, text_bad = legacy(node.execute("split", images_a=img_a, images_b=img_bad))["result"]
 
     def mean(text: str) -> float:
         return float(text.split("SSIM mean ")[1].split(",")[0])
 
     assert mean(text_good) > 0.9 > mean(text_bad)
     with pytest.raises(ValueError):
-        node.run("split", images_a=img_a)
+        legacy(node.execute("split", images_a=img_a))
     with pytest.raises(ValueError):
-        node.run("diagonal", images_a=img_a, images_b=img_a)
+        legacy(node.execute("diagonal", images_a=img_a, images_b=img_a))
 
 
 def test_compare_node_reads_gifs_and_sizes(dirs: dict[str, str]) -> None:
@@ -186,26 +187,26 @@ def test_compare_node_reads_gifs_and_sizes(dirs: dict[str, str]) -> None:
     for name, blob in (("a.gif", a), ("b.gif", b)):
         with open(os.path.join(dirs["input"], name), "wb") as fh:
             fh.write(blob)
-    _, text = JWTFGifCompare().run("side_by_side", gif_a="a.gif", gif_b="b.gif")["result"]
+    _, text = legacy(JWTFGifCompare.execute("side_by_side", gif_a="a.gif", gif_b="b.gif"))["result"]
     assert f"{len(a):,} bytes" in text and "size B/A" in text
 
 
 def test_frames_to_animated_webp_and_apng(dirs: dict[str, str]) -> None:
     imgs = as_tensor(synth.motion_clip(8))
-    node = JWTFFramesToAnimated()
-    out = node.run(imgs, 10.0, "webp", "w", quality=70)
+    node = JWTFFramesToAnimated
+    out = legacy(node.execute(imgs, 10.0, "webp", "w", quality=70))
     assert out["result"][0].endswith("w_00001.webp") and os.path.getsize(out["result"][0]) > 0
     assert "lossy q70" in out["result"][1]
-    sized = node.run(imgs, 10.0, "webp", "w", target_size_mb=0.02)
+    sized = legacy(node.execute(imgs, 10.0, "webp", "w", target_size_mb=0.02))
     stats = sized["ui"]["jwtf_gif"][0]["stats"]
     assert stats["fits"] is True and stats["bytes"] <= 0.02 * 1024 * 1024
-    png = node.run(imgs, 10.0, "apng", "a")
+    png = legacy(node.execute(imgs, 10.0, "apng", "a"))
     assert png["result"][0].endswith("a_00001.png")
     from PIL import Image
 
     assert getattr(Image.open(png["result"][0]), "n_frames", 1) == 8
     with pytest.raises(ValueError):
-        node.run(imgs, 10.0, "gif", "bad")
+        legacy(node.execute(imgs, 10.0, "gif", "bad"))
 
 
 # ------------------------------------------------------------------ video input
@@ -275,5 +276,5 @@ def test_video_to_gif_node_accepts_video(dirs: dict[str, str], video_file: str) 
         def get_stream_source(self) -> str:
             return video_file
 
-    out = JWTFVideoToGif().run("balanced", "vid", video=FakeVideo(), fps=10.0, max_width=64, dither="none", palette="global_full", compare_naive=False)
+    out = legacy(JWTFVideoToGif.execute("balanced", "vid", video=FakeVideo(), fps=10.0, max_width=64, dither="none", palette="global_full", compare_naive=False))
     assert gifio.read_gif(out["result"][0]).frames[0].shape[1] == 64

@@ -9,7 +9,9 @@ from typing import Mapping, Sequence, TypedDict
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
-from .common import CATEGORY_LLM, JSONValue, frame_to_pil, pil_to_tensor
+from comfy_api.latest import io
+
+from .common import JSONValue, frame_to_pil, pil_to_tensor
 
 TAG = "[JezzWTF Bounding Boxes]"
 PREVIEW_LONG_EDGE = 1024
@@ -485,30 +487,32 @@ def render_preview(regions: Sequence[Region], width: int, height: int,
 # --------------------------------------------------------------------------- node
 
 
-class JWTFBoundingBoxes:
-    CATEGORY = CATEGORY_LLM
-    RETURN_TYPES = ("IMAGE", "BOUNDING_BOX", "ARRAY")
-    RETURN_NAMES = ("preview", "bboxes", "elements")
-    FUNCTION = "run"
-    OUTPUT_NODE = True
+class JWTFBoundingBoxes(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFBoundingBoxes",
+            display_name='Bounding Boxes',
+            category='JezzWTF/LLM',
+            inputs=[
+                io.Int.Input("width", default=1024, min=64, max=16384, step=16),
+                io.Int.Input("height", default=1024, min=64, max=16384, step=16),
+                io.Image.Input("background", optional=True),
+                io.Custom("BOUNDING_BOX,ARRAY,STRING").Input("bboxes", optional=True),
+                io.String.Input("editor_state", default='', optional=True),
+                io.String.Input("last_incoming", default='', optional=True),
+            ],
+            outputs=[
+                io.Image.Output("preview"),
+                io.Custom("BOUNDING_BOX").Output("bboxes"),
+                io.Custom("ARRAY").Output("elements"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "width": ("INT", {"default": 1024, "min": 64, "max": 16384, "step": 16}),
-                "height": ("INT", {"default": 1024, "min": 64, "max": 16384, "step": 16}),
-            },
-            "optional": {
-                "background": ("IMAGE",),
-                "bboxes": ("BOUNDING_BOX,ARRAY,STRING",),
-                "editor_state": ("STRING", {"default": ""}),
-                "last_incoming": ("STRING", {"default": ""}),
-            },
-        }
-
-    def run(self, width: int, height: int, background: object = None, bboxes: object = None,
-            editor_state: str = "", last_incoming: str = "") -> dict[str, object]:
+    def execute(cls, width: int, height: int, background: object = None, bboxes: object = None,
+            editor_state: str = "", last_incoming: str = "") -> io.NodeOutput:
         width, height = int(width), int(height)
         incoming, key = parse_bboxes_input(bboxes, width, height)
         if incoming and key != (last_incoming or ""):
@@ -533,7 +537,7 @@ class JWTFBoundingBoxes:
                 ui["background_images"] = list(saved.get("ui", {}).get("images", []))
             except Exception as exc:  # noqa: BLE001 - preview only
                 print(f"{TAG} could not save the background preview: {exc}")
-        return {
-            "ui": ui,
-            "result": (pil_to_tensor(preview), regions_to_frames(regions, width, height), regions_to_elements(regions)),
-        }
+        return io.NodeOutput(pil_to_tensor(preview), regions_to_frames(regions, width, height), regions_to_elements(regions), ui=ui)
+
+
+NODES = [JWTFBoundingBoxes]

@@ -10,7 +10,8 @@ import math
 import re
 from dataclasses import dataclass
 
-from ._types import CATEGORY_REFMOD, InputTypes
+from comfy_api.latest import io
+
 
 MODES = ("Scale factor", "Target megapixels")
 SCALE_LABELS = ("1.5x", "2x", "2.5x", "3x", "4x", "Custom")
@@ -109,34 +110,38 @@ def pick_target(width: int, height: int, mode: str = "Scale factor", scale: str 
     return Pick(tw, th, eff, sw, sh, s, note, info)
 
 
-class JWTFH3UpscalePicker:
-    CATEGORY = CATEGORY_REFMOD
-    RETURN_TYPES = ("INT", "INT", "FLOAT", "STRING")
-    RETURN_NAMES = ("width", "height", "scale", "info")
-    FUNCTION = "pick"
-    DESCRIPTION = "Same-scale target size on a 16-px grid for the MiniMax H3 latent upscaler."
+class JWTFH3UpscalePicker(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFH3UpscalePicker",
+            display_name='H3 Upscale Picker',
+            category='JezzWTF/refmod',
+            description='Same-scale target size on a 16-px grid for the MiniMax H3 latent upscaler.',
+            inputs=[
+                io.Int.Input("width", default=640, min=1, max=16384),
+                io.Int.Input("height", default=352, min=1, max=16384),
+                io.Combo.Input("mode", options=list(MODES), default='Scale factor'),
+                io.Combo.Input("scale", options=list(SCALE_LABELS), default='2x'),
+                io.Float.Input("custom_scale", default=2.0, min=1.0, max=4.0, step=0.01),
+                io.Float.Input("target_megapixels", default=0.5, min=0.05, max=16.0, step=0.05),
+                io.Int.Input("multiple", default=16, min=16, max=256, step=16),
+            ],
+            outputs=[
+                io.Int.Output("width"),
+                io.Int.Output("height"),
+                io.Float.Output("scale"),
+                io.String.Output("info"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "width": ("INT", {"default": 640, "min": 1, "max": 16384}),
-                "height": ("INT", {"default": 352, "min": 1, "max": 16384}),
-                "mode": (list(MODES), {"default": MODES[0]}),
-                "scale": (list(SCALE_LABELS), {"default": "2x"}),
-                "custom_scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 4.0, "step": 0.01}),
-                "target_megapixels": ("FLOAT", {"default": 0.5, "min": 0.05, "max": 16.0, "step": 0.05}),
-                "multiple": ("INT", {"default": 16, "min": 16, "max": 256, "step": 16}),
-            }
-        }
-
-    def pick(self, width: int, height: int, mode: str, scale: str, custom_scale: float,
-             target_megapixels: float, multiple: int) -> dict[str, object]:
+    def execute(cls, width: int, height: int, mode: str, scale: str, custom_scale: float,
+             target_megapixels: float, multiple: int) -> io.NodeOutput:
         p = pick_target(width, height, mode, scale, custom_scale, target_megapixels, multiple)
         ui = {"jezzwtf_upscale": [{"sw": max(1, int(width)), "sh": max(1, int(height)),
                                    "tw": p.width, "th": p.height, "scale": p.scale}]}
-        return {"ui": ui, "result": (p.width, p.height, p.scale, p.info)}
+        return io.NodeOutput(p.width, p.height, p.scale, p.info, ui=ui)
 
 
-NODE_CLASS_MAPPINGS = {"JWTFH3UpscalePicker": JWTFH3UpscalePicker}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFH3UpscalePicker": "H3 Upscale Picker"}
+NODES = [JWTFH3UpscalePicker]

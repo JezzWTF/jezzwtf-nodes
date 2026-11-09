@@ -12,6 +12,8 @@ import os
 from collections.abc import Callable
 from types import ModuleType
 
+from comfy_api.latest import io
+
 log = logging.getLogger("jezzwtf.utility_core")
 
 MODULES: tuple[tuple[str, str], ...] = (
@@ -60,8 +62,7 @@ def _register_routes(modules: list[ModuleType]) -> None:
     setattr(inst, _ROUTES_FLAG, True)
 
 
-NODE_CLASS_MAPPINGS: dict[str, type] = {}
-NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {}
+NODES: list[type[io.ComfyNode]] = []
 
 _skip = _disabled()
 _loaded: list[ModuleType] = []
@@ -74,10 +75,9 @@ for _name, _label in MODULES:
     except Exception as _exc:
         log.warning("utility_core: failed to load %s: %s", _name, _exc)
         continue
-    NODE_CLASS_MAPPINGS.update(getattr(_mod, "NODE_CLASS_MAPPINGS", {}))
-    NODE_DISPLAY_NAME_MAPPINGS.update(getattr(_mod, "NODE_DISPLAY_NAME_MAPPINGS", {}))
+    NODES.extend(getattr(_mod, "NODES", []))
     _loaded.append(_mod)
 
 _register_routes(_loaded)
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODES"]

@@ -19,6 +19,7 @@ from PIL import Image
 
 from nodes.llm_cards import bakers, character_chat as cc
 from nodes.llm_cards.png_chunks import decode_chara, read_png_text_from_file, save_png_with_text
+from v3_helpers import legacy
 
 
 @pytest.fixture()
@@ -62,7 +63,7 @@ def _batch(n: int = 2) -> torch.Tensor:
 
 def test_v2_baker_saves_and_verifies(comfy_dirs: types.ModuleType) -> None:
     card = json.dumps({"name": "Mira/Q", "description": "héllo ✓", "first_mes": "Hi"})
-    res = bakers.JWTFV2PNGBaker().bake(_batch(2), card, "V2_cards/%name%", True, save_to=bakers.SAVE_TO_OUTPUT)
+    res = legacy(bakers.JWTFV2PNGBaker.execute(_batch(2), card, "V2_cards/%name%", True, save_to=bakers.SAVE_TO_OUTPUT))
     paths = res["result"][0].split("\n")  # type: ignore[index]
     assert len(paths) == 2 and res["result"][1] == "Mira/Q"  # type: ignore[index]
     assert paths[0].endswith("Mira_Q_00001_.png") and paths[1].endswith("Mira_Q_00002_.png")
@@ -78,16 +79,16 @@ def test_v2_baker_saves_and_verifies(comfy_dirs: types.ModuleType) -> None:
 
 def test_v2_baker_errors_are_readable(comfy_dirs: types.ModuleType) -> None:
     with pytest.raises(ValueError, match="V2 PNG Baker"):
-        bakers.JWTFV2PNGBaker().bake(_batch(1), "not json", "x", True)
+        legacy(bakers.JWTFV2PNGBaker.execute(_batch(1), "not json", "x", True))
 
 
 def test_workflow_baker_writes_chunks_and_counts_up(comfy_dirs: types.ModuleType) -> None:
     wf = {"nodes": [{"id": 1, "type": "Note", "widgets_values": ["ünï"]}], "links": []}
     api_prompt = {"1": {"class_type": "Note", "inputs": {}}}
     text = json.dumps({"workflow": json.dumps(wf), "prompt": api_prompt})
-    baker = bakers.JWTFWorkflowPNGBaker()
-    first = baker.bake(_batch(1), text, "../Wf/./a:b")
-    second = baker.bake(_batch(1), text, "../Wf/./a:b")
+    baker = bakers.JWTFWorkflowPNGBaker
+    first = legacy(baker.execute(_batch(1), text, "../Wf/./a:b"))
+    second = legacy(baker.execute(_batch(1), text, "../Wf/./a:b"))
     p1 = first["result"][0]  # type: ignore[index]
     assert p1.replace("\\", "/").endswith("Wf/a_b_00001_.png")
     assert second["result"][0].replace("\\", "/").endswith("Wf/a_b_00002_.png")  # type: ignore[index]
@@ -99,7 +100,7 @@ def test_workflow_baker_writes_chunks_and_counts_up(comfy_dirs: types.ModuleType
 
 def test_workflow_baker_rejects_other_json(comfy_dirs: types.ModuleType) -> None:
     with pytest.raises(ValueError, match="neither a ComfyUI workflow"):
-        bakers.JWTFWorkflowPNGBaker().bake(_batch(1), '{"a": 1}', "x")
+        legacy(bakers.JWTFWorkflowPNGBaker.execute(_batch(1), '{"a": 1}', "x"))
 
 
 # --------------------------------------------------------------------------- character chat
@@ -142,7 +143,7 @@ def _chat(node: cc.JWTFCharacterChat, clip: FakeClip, **over: object) -> dict[st
         min_p=0.05, repetition_penalty=1.05, seed=7, thinking=False, context_messages=40,
     )
     args.update(over)
-    return node.chat(**args)  # type: ignore[arg-type]
+    return legacy(node.execute(**args))  # type: ignore[arg-type]
 
 
 def test_chat_seeds_greeting_without_generating(comfy_dirs: types.ModuleType) -> None:
@@ -217,7 +218,7 @@ def test_input_types_orders_optional_widgets_by_spec(comfy_dirs: types.ModuleTyp
     opt = list(cc.JWTFCharacterChat.INPUT_TYPES()["optional"])
     assert opt == ["card_path", "action", "user_message", "history_json", "presence_penalty", "mtp",
                    "video_max_frames", "image", "audio", "video", "system_prompt", "sampling_mode"]
-    assert cc.JWTFCharacterChat.INPUT_TYPES()["required"]["character"][0] == [cc.PLACEHOLDER]
+    assert cc.JWTFCharacterChat.INPUT_TYPES()["required"]["character"][1]["options"] == [cc.PLACEHOLDER]
 
 
 # --------------------------------------------------------------------------- routes

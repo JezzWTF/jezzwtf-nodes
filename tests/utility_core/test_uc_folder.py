@@ -11,6 +11,7 @@ from utility_core.folder_utils import (
     SORT_ALPHA, SORT_NUMERIC, FrameSelector, caption_target, clean_path, fit_even, list_media, next_index,
     preview_name, resolve_index, sort_names,
 )
+from v3_helpers import legacy
 
 
 def test_natural_sort() -> None:
@@ -128,16 +129,16 @@ def test_image_loader_node(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     image, mask, _ = load_image(str(tmp_path / "f2.png"))
     assert image.shape == (1, 4, 6, 3) and mask.shape == (1, 4, 6)
     assert abs(float(mask[0, 0, 0]) - (1 - 64 / 255)) < 1e-6
-    out = JWTFFolderImageBatch().run(str(tmp_path), SORT_NUMERIC, 3, False)  # single mode wraps 3 -> 1
+    out = legacy(JWTFFolderImageBatch.execute(str(tmp_path), SORT_NUMERIC, 3, False))  # single mode wraps 3 -> 1
     _, _, stem, path, idx, total = out["result"]
     assert (stem, idx, total) == ("f10", 1, 2)
     assert out["ui"]["batch_info"] == [1, 2] and out["ui"]["next_index"] == [-1]
     assert out["ui"]["file_name"] == ["f10.png"]
     with pytest.raises(ValueError, match="set index to 0"):
-        JWTFFolderImageBatch().run(str(tmp_path), SORT_NUMERIC, 3, True)  # folder mode raises
-    folder = JWTFFolderImageBatch().run(str(tmp_path), SORT_NUMERIC, 0, True)
+        legacy(JWTFFolderImageBatch.execute(str(tmp_path), SORT_NUMERIC, 3, True))  # folder mode raises
+    folder = legacy(JWTFFolderImageBatch.execute(str(tmp_path), SORT_NUMERIC, 0, True))
     assert folder["ui"]["next_index"] == [1] and folder["ui"]["auto_run"] == [1]
-    assert isinstance(JWTFFolderImageBatch.IS_CHANGED(str(tmp_path), SORT_NUMERIC, 0, False), str)
+    assert isinstance(JWTFFolderImageBatch.fingerprint_inputs(str(tmp_path), SORT_NUMERIC, 0, False), str)
 
 
 def test_video_loader_node(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,8 +159,8 @@ def test_video_loader_node(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
                 out.mux(packet)
         for packet in stream.encode():
             out.mux(packet)
-    res = fb.JWTFFolderVideoBatch().run(str(vid_dir), SORT_NUMERIC, 0, False, force_rate=12, frame_load_cap=5,
-                                        resize_longest_side=32)
+    res = legacy(fb.JWTFFolderVideoBatch.execute(str(vid_dir), SORT_NUMERIC, 0, False, force_rate=12, frame_load_cap=5,
+                                        resize_longest_side=32))
     frames, audio, stem, _, idx, total, fps, _video = res["result"]
     assert frames.shape == (5, 24, 32, 3)
     assert fps == 12.0 and stem == "clip" and (idx, total) == (0, 1)

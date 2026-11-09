@@ -4,18 +4,10 @@ from __future__ import annotations
 
 import os
 
-from ._comfy import CATEGORY_LOADERS, folder_roots, log
-from .diffusers_logic import (
-    FLASH_CHOICES,
-    SAGE_CHOICES,
-    backend_choice,
-    collect_roots,
-    describe_backend,
-    diffusers_components,
-    resolve_backend,
-    resolve_model,
-    scan_models,
-)
+from comfy_api.latest import io
+
+from ._comfy import folder_roots, log
+from .diffusers_logic import FLASH_CHOICES, SAGE_CHOICES, backend_choice, collect_roots, describe_backend, diffusers_components, resolve_backend, resolve_model, scan_models
 from .relay_logic import AttnFn, install_override, make_backend_override
 
 
@@ -115,25 +107,29 @@ def _load_text_encoders(encoders: list[list[str]]) -> object:
                                                   embedding_directory=None)
 
 
-class JWTFDiffusersLoader:
-    CATEGORY = CATEGORY_LOADERS
-    RETURN_TYPES = ("MODEL", "CLIP", "VAE")
-    RETURN_NAMES = ("MODEL", "CLIP", "VAE")
-    FUNCTION = "load"
-    DESCRIPTION = "Load a Diffusers-layout folder or a single diffusion-model file, with an optional attention backend."
+class JWTFDiffusersLoader(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFDiffusersLoader",
+            display_name='Diffusers Loader',
+            category='JezzWTF/loaders',
+            description='Load a Diffusers-layout folder or a single diffusion-model file, with an optional attention backend.',
+            inputs=[
+                io.Combo.Input("model_name", options=list_models()),
+                io.Combo.Input("sageattention_version", options=SAGE_CHOICES, default='None'),
+                io.Combo.Input("flashattention_version", options=FLASH_CHOICES, default='None'),
+            ],
+            outputs=[
+                io.Model.Output("MODEL"),
+                io.Clip.Output("CLIP"),
+                io.Vae.Output("VAE"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        return {
-            "required": {
-                "model_name": (list_models(),),
-                "sageattention_version": (SAGE_CHOICES, {"default": "None"}),
-                "flashattention_version": (FLASH_CHOICES, {"default": "None"}),
-            }
-        }
-
-    def load(self, model_name: str, sageattention_version: str = "None",
-             flashattention_version: str = "None") -> tuple[object, object | None, object | None]:
+    def execute(cls, model_name: str, sageattention_version: str = "None",
+             flashattention_version: str = "None") -> io.NodeOutput:
         import comfy.sd  # type: ignore[import-not-found]
 
         path = resolve_model(model_roots(), model_name)
@@ -153,4 +149,7 @@ class JWTFDiffusersLoader:
                 vae = comfy.sd.VAE(sd=_load_merged(parts.vae))
         else:
             model = comfy.sd.load_diffusion_model(path)
-        return apply_backend(model, sageattention_version, flashattention_version), clip, vae
+        return io.NodeOutput(apply_backend(model, sageattention_version, flashattention_version), clip, vae)
+
+
+NODES = [JWTFDiffusersLoader]

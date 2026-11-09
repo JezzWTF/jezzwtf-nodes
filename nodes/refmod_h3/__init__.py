@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import importlib
 
+from comfy_api.latest import io
+
 from ._comfy import log
 
-NODE_CLASS_MAPPINGS: dict[str, type] = {}
-NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {}
+NODES: list[type[io.ComfyNode]] = []
 
 try:  # the refmods model folder must exist before any node's INPUT_TYPES lists it
     from .library import register_folder
@@ -32,8 +33,7 @@ _MODULES: tuple[str, ...] = (
 for _name in _MODULES:
     try:
         _mod = importlib.import_module(f".{_name}", __name__)
-        NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)
-        NODE_DISPLAY_NAME_MAPPINGS.update(_mod.NODE_DISPLAY_NAME_MAPPINGS)
+        NODES.extend(_mod.NODES)
     except Exception as _exc:  # pragma: no cover - surfaced in the ComfyUI log
         log.warning("jezzwtf refmod_h3: %s unavailable: %s", _name, _exc)
 
@@ -44,4 +44,4 @@ try:
 except Exception as _exc:  # pragma: no cover
     log.warning("jezzwtf refmod_h3: routes not registered: %s", _exc)
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODES"]

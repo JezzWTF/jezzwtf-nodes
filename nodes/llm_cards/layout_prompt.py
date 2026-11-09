@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .common import CATEGORY_LLM
+from comfy_api.latest import io
+
 
 DEFAULT_SCENE = (
     "A retro travel poster for a seaside town: a red lighthouse on a cliff at the right, "
@@ -66,23 +67,29 @@ def build_user_prompt(scene: str) -> str:
     return f"Scene description:\n{(scene or '').strip()}\n\nReturn the JSON array now."
 
 
-class JWTFLayoutLLMPrompt:
-    CATEGORY = CATEGORY_LLM
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("system_prompt", "prompt")
-    FUNCTION = "build"
+class JWTFLayoutLLMPrompt(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLayoutLLMPrompt",
+            display_name='Layout LLM Prompt',
+            category='JezzWTF/LLM',
+            inputs=[
+                io.String.Input("scene", default='A retro travel poster for a seaside town: a red lighthouse on a cliff at the right, a small sailboat on the sea at the lower left, and the title "VISIT PORT HAVEN" in bold cream letters across the top.', multiline=True),
+                io.Int.Input("width", default=1024, min=16, max=16384, step=16),
+                io.Int.Input("height", default=1024, min=16, max=16384, step=16),
+                io.Int.Input("max_boxes", default=5, min=1, max=16),
+                io.String.Input("extra_rules", default='', multiline=True, optional=True),
+            ],
+            outputs=[
+                io.String.Output("system_prompt"),
+                io.String.Output("prompt"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "scene": ("STRING", {"default": DEFAULT_SCENE, "multiline": True}),
-                "width": ("INT", {"default": 1024, "min": 16, "max": 16384, "step": 16}),
-                "height": ("INT", {"default": 1024, "min": 16, "max": 16384, "step": 16}),
-                "max_boxes": ("INT", {"default": 5, "min": 1, "max": 16}),
-            },
-            "optional": {"extra_rules": ("STRING", {"default": "", "multiline": True})},
-        }
+    def execute(cls, scene: str, width: int, height: int, max_boxes: int, extra_rules: str = "") -> io.NodeOutput:
+        return io.NodeOutput(build_system_prompt(int(width), int(height), int(max_boxes), extra_rules), build_user_prompt(scene))
 
-    def build(self, scene: str, width: int, height: int, max_boxes: int, extra_rules: str = "") -> tuple[str, str]:
-        return build_system_prompt(int(width), int(height), int(max_boxes), extra_rules), build_user_prompt(scene)
+
+NODES = [JWTFLayoutLLMPrompt]

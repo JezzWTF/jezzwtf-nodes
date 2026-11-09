@@ -6,8 +6,8 @@ conditioning. Adding a model = registering one more ``Handler``.
 """
 from __future__ import annotations
 
+from io import BytesIO
 import base64
-import io
 import json
 import logging
 import math
@@ -22,8 +22,10 @@ import torch
 from PIL import Image
 from safetensors import safe_open
 
+from comfy_api.latest import io
+
 from . import _comfy
-from ._types import CATEGORY_REFMOD, InputTypes, JSONDict, RefModError
+from ._types import JSONDict, RefModError
 from .bundle import _atomic_save, read_metadata
 from .extract import resize_frames
 from .library import RESERVED_DIRS, check_rel, is_inside, save_root, search_dirs
@@ -283,7 +285,7 @@ def thumb_b64(frame: torch.Tensor) -> str:
     arr = (frame[0, ..., :3].clamp(0, 1).cpu().numpy() * 255.0).round().astype(np.uint8)
     im = Image.fromarray(arr)
     im.thumbnail((THUMB_EDGE, THUMB_EDGE))
-    buf = io.BytesIO()
+    buf = BytesIO()
     im.save(buf, format="JPEG", quality=82)
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
@@ -472,7 +474,7 @@ def thumb_bytes(name: str) -> bytes | None:
                 arr = fh.get_tensor("img_0")[0].numpy()
                 im = Image.fromarray(arr)
                 im.thumbnail((THUMB_EDGE, THUMB_EDGE))
-                buf = io.BytesIO()
+                buf = BytesIO()
                 im.save(buf, format="JPEG", quality=82)
                 data = buf.getvalue()
     if data is not None:
@@ -511,30 +513,35 @@ def _frames_of(*images: torch.Tensor | None) -> list[torch.Tensor]:
     return out
 
 
-class JWTFUnifiedRefModBake:
-    CATEGORY = CATEGORY_REFMOD
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("path",)
-    FUNCTION = "bake"
-    OUTPUT_NODE = True
+class JWTFUnifiedRefModBake(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFUnifiedRefModBake",
+            display_name='Image RefMod Bake',
+            category='JezzWTF/refmod',
+            inputs=[
+                io.Combo.Input("model", options=list(HANDLERS), default='qwen21'),
+                io.Image.Input("images"),
+                io.String.Input("name", default='my_character'),
+                io.Int.Input("resolution", default=1024, min=0, max=4096, step=16),
+                io.String.Input("subfolder", default=''),
+                io.Boolean.Input("overwrite", default=False),
+                io.Vae.Input("vae", optional=True),
+                io.Image.Input("image_2", optional=True),
+                io.Image.Input("image_3", optional=True),
+                io.Image.Input("image_4", optional=True),
+            ],
+            outputs=[
+                io.String.Output("path"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "model": (list(HANDLERS), {"default": next(iter(HANDLERS))}),
-                "images": ("IMAGE",),
-                "name": ("STRING", {"default": "my_character"}),
-                "resolution": ("INT", {"default": 1024, "min": 0, "max": 4096, "step": 16}),
-                "subfolder": ("STRING", {"default": ""}),
-                "overwrite": ("BOOLEAN", {"default": False}),
-            },
-            "optional": {"vae": ("VAE",), "image_2": ("IMAGE",), "image_3": ("IMAGE",), "image_4": ("IMAGE",)},
-        }
-
-    def bake(self, model: str, images: torch.Tensor, name: str, resolution: int, subfolder: str, overwrite: bool,
+    def execute(cls, model: str, images: torch.Tensor, name: str, resolution: int, subfolder: str, overwrite: bool,
              vae: object | None = None, image_2: torch.Tensor | None = None, image_3: torch.Tensor | None = None,
-             image_4: torch.Tensor | None = None, **_: object) -> dict[str, object]:
+             image_4: torch.Tensor | None = None, **_: object) -> io.NodeOutput:
         h = HANDLERS.get(model)
         if h is None:
             raise RefModError(f"unknown model {model!r}")
@@ -547,53 +554,53 @@ class JWTFUnifiedRefModBake:
             raise RefModError("connect the model's VAE")
         dest = unified_output_path(name, subfolder, h)
         if os.path.exists(dest) and not overwrite:
-            return {"ui": {"text": [f"{dest} already exists, skipped (enable overwrite to re-bake)"]},
-                    "result": (dest,)}
+            return io.NodeOutput(dest, ui={"text": [f"{dest} already exists, skipped (enable overwrite to re-bake)"]})
         encs = [h.encode(h, vae, f.float(), int(resolution)) for f in frames]
         tensors, meta = build_file(h, os.path.splitext(os.path.basename(dest))[0], encs, int(resolution), frames[0])
         _atomic_save(tensors, meta, dest)
         invalidate(dest)
         sizes = ", ".join(f"{e.size[0]}x{e.size[1]}" for e in encs)
-        return {"ui": {"text": [f"{h.label}: {len(encs)} ref(s) [{sizes}] -> {dest}"]}, "result": (dest,)}
+        return io.NodeOutput(dest, ui={"text": [f"{h.label}: {len(encs)} ref(s) [{sizes}] -> {dest}"]})
 
 
-class JWTFUnifiedRefModApply:
-    CATEGORY = CATEGORY_REFMOD
-    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "LATENT")
-    RETURN_NAMES = ("positive", "negative", "latent")
-    FUNCTION = "apply"
+class JWTFUnifiedRefModApply(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFUnifiedRefModApply",
+            display_name='Image RefMod Apply',
+            category='JezzWTF/refmod',
+            description="Apply saved RefMods to Qwen, Fibo or Flux image-edit conditioning, with the model detected from the RefMod or chosen by hand.",
+            inputs=[
+                io.Combo.Input("model", options=[AUTO] + list(HANDLERS), default='auto (from refmod)'),
+                io.Combo.Input("refmod_1", options=choices(), default='None'),
+                io.Clip.Input("clip", optional=True),
+                io.String.Input("prompt", default='', multiline=True, dynamic_prompts=True, optional=True),
+                io.String.Input("negative_prompt", default='', multiline=True, dynamic_prompts=True, optional=True),
+                io.Conditioning.Input("positive", optional=True),
+                io.Conditioning.Input("negative", optional=True),
+                io.Combo.Input("refmod_2", options=choices(), default='None', optional=True),
+                io.Combo.Input("refmod_3", options=choices(), default='None', optional=True),
+                io.Image.Input("extra_image", optional=True),
+                io.Vae.Input("vae", optional=True),
+                io.Int.Input("extra_image_resolution", default=1024, min=0, max=4096, step=16, optional=True),
+                io.Combo.Input("extra_image_scale", options=list(EXTRA_SCALE_LABELS), default='keep aspect (resolution)', optional=True),
+                io.Float.Input("ref_strength", default=1.0, min=0.0, max=1.0, step=0.01, optional=True),
+                io.Boolean.Input("ref_on_negative", default=True, optional=True),
+            ],
+            outputs=[
+                io.Conditioning.Output("positive"),
+                io.Conditioning.Output("negative"),
+                io.Latent.Output("latent"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        names = choices()
-        return {
-            "required": {
-                "model": ([AUTO] + list(HANDLERS), {"default": AUTO}),
-                "refmod_1": (names, {"default": NONE}),
-            },
-            "optional": {
-                "clip": ("CLIP",),
-                "prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
-                "negative_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
-                "positive": ("CONDITIONING",),
-                "negative": ("CONDITIONING",),
-                "refmod_2": (names, {"default": NONE}),
-                "refmod_3": (names, {"default": NONE}),
-                "extra_image": ("IMAGE",),
-                "vae": ("VAE",),
-                "extra_image_resolution": ("INT", {"default": 1024, "min": 0, "max": 4096, "step": 16}),
-                "extra_image_scale": (list(EXTRA_SCALE_LABELS), {"default": EXTRA_SCALE_LABELS[0]}),
-                "ref_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "ref_on_negative": ("BOOLEAN", {"default": True}),
-            },
-        }
-
-    @classmethod
-    def VALIDATE_INPUTS(cls, **_: object) -> bool:
+    def validate_inputs(cls, **_: object) -> bool:
         return True
 
     @classmethod
-    def IS_CHANGED(cls, refmod_1: str = NONE, refmod_2: str = NONE, refmod_3: str = NONE, **_: object) -> str:
+    def fingerprint_inputs(cls, refmod_1: str = NONE, refmod_2: str = NONE, refmod_3: str = NONE, **_: object) -> str:
         idx = index()
         parts: list[str] = []
         for n in (refmod_1, refmod_2, refmod_3):
@@ -603,11 +610,12 @@ class JWTFUnifiedRefModApply:
             parts.append(str(os.path.getmtime(e[0])) if e else "missing")
         return "|".join(parts)
 
-    def apply(self, model: str, refmod_1: str, clip: object | None = None, prompt: str = "",
-              negative_prompt: str = "", positive: Cond | None = None, negative: Cond | None = None,
+    @classmethod
+    def execute(cls, model: str, refmod_1: str, clip: object | None = None, prompt: str = "",
+                negative_prompt: str = "", positive: Cond | None = None, negative: Cond | None = None,
               refmod_2: str = NONE, refmod_3: str = NONE, extra_image: torch.Tensor | None = None,
               vae: object | None = None, extra_image_resolution: int = 1024, extra_image_scale: str = "",
-              ref_strength: float = 1.0, ref_on_negative: bool = True) -> tuple[Cond, Cond, dict[str, torch.Tensor]]:
+              ref_strength: float = 1.0, ref_on_negative: bool = True) -> io.NodeOutput:
         h = HANDLERS.get(model) if model != AUTO else None
         if model != AUTO and h is None:
             raise RefModError(f"unknown model {model!r}")
@@ -649,15 +657,7 @@ class JWTFUnifiedRefModApply:
                            ref_on_negative=bool(ref_on_negative))
         pos, neg = h.build(h, ctx, lats, imgs)
         empty = torch.zeros_like(lats[0]) if lats else torch.zeros([1, h.latent_channels, 64, 64], device=device)
-        return pos, neg, {"samples": empty}
+        return io.NodeOutput(pos, neg, {"samples": empty})
 
 
-NODE_CLASS_MAPPINGS = {
-    "JWTFUnifiedRefModBake": JWTFUnifiedRefModBake,
-    "JWTFUnifiedRefModApply": JWTFUnifiedRefModApply,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "JWTFUnifiedRefModBake": "Image RefMod Bake",
-    "JWTFUnifiedRefModApply": "Image RefMod Apply",
-}
-
+NODES = [JWTFUnifiedRefModBake, JWTFUnifiedRefModApply]

@@ -6,7 +6,9 @@ from collections.abc import Callable, Mapping
 
 import torch
 
-from ._comfy import CATEGORY_LORA, log, lora_full_path, lora_names
+from comfy_api.latest import io
+
+from ._comfy import log, lora_full_path, lora_names
 from .regional_logic import (
     KeyMapValue,
     LoraPair,
@@ -125,36 +127,39 @@ def make_wrapper(session: RegionalSession, modules: Mapping[str, tuple[torch.nn.
     return wrapper
 
 
-class JWTFRegionalLoRA:
-    CATEGORY = CATEGORY_LORA
-    RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING")
-    RETURN_NAMES = ("MODEL", "CONDITIONING", "NEGATIVE")
-    FUNCTION = "apply"
-    DESCRIPTION = "Two character LoRAs, each confined to its own region of the image, with per-region prompts."
+class JWTFRegionalLoRA(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRegionalLoRA",
+            display_name='Regional Character LoRA',
+            category='JezzWTF/lora',
+            description='Two character LoRAs, each confined to its own region of the image, with per-region prompts.',
+            inputs=[
+                io.Model.Input("model"),
+                io.Clip.Input("clip"),
+                io.Combo.Input("lora_a", options=lora_names()),
+                io.Float.Input("strength_a", default=1.0, min=-4.0, max=4.0, step=0.05),
+                io.Combo.Input("lora_b", options=lora_names()),
+                io.Float.Input("strength_b", default=1.0, min=-4.0, max=4.0, step=0.05),
+                io.Float.Input("feather", default=0.06, min=0.0, max=0.3, step=0.01),
+                io.String.Input("regions", default='{}', multiline=False),
+            ],
+            outputs=[
+                io.Model.Output("MODEL"),
+                io.Conditioning.Output("CONDITIONING"),
+                io.Conditioning.Output("NEGATIVE"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple[object, ...]]]:
-        loras = lora_names()
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "clip": ("CLIP",),
-                "lora_a": (loras,),
-                "strength_a": ("FLOAT", {"default": 1.0, "min": -4.0, "max": 4.0, "step": 0.05}),
-                "lora_b": (loras,),
-                "strength_b": ("FLOAT", {"default": 1.0, "min": -4.0, "max": 4.0, "step": 0.05}),
-                "feather": ("FLOAT", {"default": 0.06, "min": 0.0, "max": 0.3, "step": 0.01}),
-                "regions": ("STRING", {"default": "{}", "multiline": False}),
-            }
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, regions: str = "", lora_a: str = "", lora_b: str = "", strength_a: float = 1.0,
+    def fingerprint_inputs(cls, regions: str = "", lora_a: str = "", lora_b: str = "", strength_a: float = 1.0,
                    strength_b: float = 1.0, feather: float = 0.06, **_: object) -> str:
         return f"{regions}|{lora_a}|{lora_b}|{strength_a}|{strength_b}|{feather}"
 
-    def apply(self, model: object, clip: object, lora_a: str, strength_a: float, lora_b: str, strength_b: float,
-              feather: float, regions: str) -> tuple[object, list[CondEntry], list[CondEntry]]:
+    @classmethod
+    def execute(cls, model: object, clip: object, lora_a: str, strength_a: float, lora_b: str, strength_b: float,
+              feather: float, regions: str) -> io.NodeOutput:
         region_list, glob = parse_regions(regions)
         pairs = {"a": _load_pairs(lora_a, strength_a), "b": _load_pairs(lora_b, strength_b)}
 
@@ -189,4 +194,7 @@ class JWTFRegionalLoRA:
                                           lambda *_a, **_k: session.release())
 
         conds, negative = build_conditioning(clip, region_list, glob)
-        return patched, conds, negative
+        return io.NodeOutput(patched, conds, negative)
+
+
+NODES = [JWTFRegionalLoRA]

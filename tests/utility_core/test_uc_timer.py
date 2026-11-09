@@ -6,6 +6,7 @@ import pytest
 
 import utility_core.timer as timer
 from utility_core.timer import JWTFTimer, TimerRuns
+from v3_helpers import hidden, legacy, overrides
 
 
 def test_tick_counts_and_finishes() -> None:
@@ -83,8 +84,13 @@ def test_validate_inputs_does_not_disable_link_type_checks() -> None:
     from utility_core._types import ANY
 
     # ComfyUI skips link type validation when VALIDATE_INPUTS declares `input_types`.
-    assert not hasattr(JWTFTimer, "VALIDATE_INPUTS")
+    assert not overrides(JWTFTimer, "validate_inputs")
     assert not ("IMAGE" != ANY)  # the wildcard trigger still accepts any link
+
+
+def _run_timer(total: int, **kw: object) -> object:
+    with hidden(JWTFTimer, unique_id="a:4"):
+        return legacy(JWTFTimer.execute(total, **kw))
 
 
 def test_node_shape_and_tick(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -93,11 +99,11 @@ def test_node_shape_and_tick(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(timer, "RUNS", TimerRuns())
     spec = JWTFTimer.INPUT_TYPES()
     assert spec["required"]["total_images"][1] == {"default": 1, "min": 1, "max": 999999}
-    assert "trigger" in spec["optional"] and spec["hidden"] == {"unique_id": "UNIQUE_ID"}
-    assert JWTFTimer.OUTPUT_NODE and JWTFTimer.RETURN_TYPES == ()
-    assert math.isnan(JWTFTimer.IS_CHANGED())
-    assert JWTFTimer().run(2, unique_id="a:4") == ()
-    assert JWTFTimer().run(2, trigger=object(), unique_id="a:4") == ()
+    assert "trigger" in spec["optional"] and spec["hidden"]["unique_id"] == ("UNIQUE_ID",)
+    assert JWTFTimer.OUTPUT_NODE and not JWTFTimer.RETURN_TYPES
+    assert math.isnan(JWTFTimer.fingerprint_inputs())
+    assert _run_timer(2) == ()
+    assert _run_timer(2, trigger=object()) == ()
     assert [e for e, _ in sent] == ["jezzwtf.timer_update"] * 2
     assert sent[1][1]["node_id"] == "a:4" and sent[1][1]["current"] == 2 and sent[1][1]["total"] == 2
     assert set(sent[1][1]) == {"node_id", "current", "total", "started_at", "now", "run_id"}

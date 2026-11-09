@@ -23,6 +23,7 @@ from nodes.llm_cards import character as ch
 from nodes.llm_cards import character_chat as cc
 from nodes.llm_cards import lmstudio as lms
 from nodes.llm_cards.common import MAX_IMAGES
+from v3_helpers import hidden, legacy
 
 PACK_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -103,7 +104,7 @@ def _chat(clip: object, **over: object) -> dict[str, object]:
         user_message="hi", history_json=json.dumps([{"role": "assistant", "content": "Hello"}]),
     )
     args.update(over)
-    return cc.JWTFCharacterChat().chat(**args)  # type: ignore[arg-type]
+    return legacy(cc.JWTFCharacterChat.execute(**args))  # type: ignore[arg-type]
 
 
 def test_generate_without_mtp_parameter_does_not_raise(comfy_dirs: types.ModuleType) -> None:
@@ -300,8 +301,8 @@ def test_node_reraises_interrupt_instead_of_returning_error_text(monkeypatch: py
         raise _Interrupted()
 
     monkeypatch.setattr(lms, "run_completion", boom)
-    with pytest.raises(_Interrupted):
-        lms.JWTFLMStudio().run("http://x:1", "m", "", "hi", 0, 0.7, 0.95, True, 0, "512", 8)
+    with pytest.raises(_Interrupted), hidden(lms.JWTFLMStudio, unique_id=None):
+        legacy(lms.JWTFLMStudio.execute("http://x:1", "m", "", "hi", 0, 0.7, 0.95, True, 0, "512", 8))
 
 
 # --------------------------------------------------------------------------- 5. mid-stream errors

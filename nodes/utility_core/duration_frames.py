@@ -4,8 +4,9 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, TypedDict
 
+from comfy_api.latest import io
+
 from ._comfy import read_json_object
-from ._types import CATEGORY_UTILS, InputTypes
 from .expr_eval import ExprError, to_frames
 
 if TYPE_CHECKING:
@@ -64,26 +65,29 @@ def eval_rows(preset: str, expression: str, fps: int, values: list[object]) -> t
     return fps_used, expr, rows
 
 
-class JWTFDurationFrames:
-    CATEGORY = CATEGORY_UTILS
-    # ComfyUI will not connect an INT output to a FLOAT input, and most frame-rate inputs
-    # (Video Compare, Create Video, ...) are FLOAT, so `fps` is a FLOAT and `fps_int` covers INT inputs.
-    RETURN_TYPES = ("INT", "FLOAT", "FLOAT", "INT")
-    RETURN_NAMES = ("frames", "seconds", "fps", "fps_int")
-    FUNCTION = "run"
+class JWTFDurationFrames(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFDurationFrames",
+            display_name='Duration to Frames',
+            category='JezzWTF/utils',
+            inputs=[
+                io.Float.Input("duration", default=6.0, min=0.0, max=3600.0, step=0.1, round=0.001),
+                io.Combo.Input("preset", options=list(PRESET_NAMES), default='MiniMax H3 (24 FPS)'),
+                io.String.Input("expression", default='max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17', multiline=True),
+                io.Int.Input("fps", default=24, min=1, max=240),
+            ],
+            outputs=[
+                io.Int.Output("frames"),
+                io.Float.Output("seconds"),
+                io.Float.Output("fps"),
+                io.Int.Output("fps_int"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "duration": ("FLOAT", {"default": 6.0, "min": 0.0, "max": 3600.0, "step": 0.1, "round": 0.001}),
-                "preset": (list(PRESET_NAMES), {"default": "MiniMax H3 (24 FPS)"}),
-                "expression": ("STRING", {"multiline": True, "default": MINIMAX_EXPR}),
-                "fps": ("INT", {"default": 24, "min": 1, "max": 240}),
-            }
-        }
-
-    def run(self, duration: float, preset: str, expression: str, fps: int) -> dict[str, object]:
+    def execute(cls, duration: float, preset: str, expression: str, fps: int) -> io.NodeOutput:
         fps_used, expr = resolve(preset, expression, fps)
         try:
             frames = to_frames(expr, float(duration), fps_used)
@@ -91,7 +95,7 @@ class JWTFDurationFrames:
             raise ValueError(f"Duration -> Frames: {exc} (expression: {expr})") from None
         seconds = frames / fps_used
         info = {"duration": duration, "frames": frames, "seconds": seconds, "fps": fps_used, "expression": expr}
-        return {"ui": {UI_KEY: [info]}, "result": (frames, seconds, float(fps_used), fps_used)}
+        return io.NodeOutput(frames, seconds, float(fps_used), fps_used, ui={UI_KEY: [info]})
 
 
 def register_routes(routes: "web.RouteTableDef") -> None:
@@ -122,5 +126,4 @@ def register_routes(routes: "web.RouteTableDef") -> None:
         return web.json_response({"fps": fps_used, "expression": expr, "rows": rows})
 
 
-NODE_CLASS_MAPPINGS = {"JWTFDurationFrames": JWTFDurationFrames}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFDurationFrames": "Duration to Frames"}
+NODES = [JWTFDurationFrames]

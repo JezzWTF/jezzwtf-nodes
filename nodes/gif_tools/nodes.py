@@ -11,11 +11,13 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from comfy_api.latest import io
+
 from .animated import FORMATS, AnimResult, encode_animated
 from .frames import Clip, Frame, FrameSource, PrepOptions, make_clip, source_from_arrays, source_from_timed_arrays, source_from_video_file
 from .gifio import read_gif
 from .optimise import OptimiseRequest, OptimiseResult, optimise
-from .output import OUTPUT_SUBFOLDER, reserve_output_path, resolve_existing_file
+from .output import reserve_output_path, resolve_existing_file
 from .quality import compare_sequences
 from .runtime import Progress, check_interrupt
 from .settings import (DELAY_MODES, DENOISE, DITHERS, MODES, PALETTES, RESIZE_FILTERS, check_choice, check_colors, check_float,
@@ -24,10 +26,8 @@ from .timing import MAX_FPS, fps_notes, resolve_fps
 
 try:
     from ..utility_core._comfy import input_dir, temp_dir
-    from ..utility_core._types import InputTypes
 except ImportError:  # imported as a top-level package (tests)
     from utility_core._comfy import input_dir, temp_dir  # type: ignore[no-redef]
-    from utility_core._types import InputTypes  # type: ignore[no-redef]
 
 CATEGORY = "JezzWTF/gif"
 MAX_PREVIEW_FRAMES = 240
@@ -225,7 +225,7 @@ def _run_optimise(source: FrameSource, values: dict[str, object], native_notes: 
     return result, path, subfolder, filename, notes
 
 
-def _finish_gif(result: OptimiseResult, path: str, subfolder: str, filename: str, mode: str) -> tuple[str, torch.Tensor, str, UIResult]:
+def _finish_gif(result: OptimiseResult, path: str, subfolder: str, filename: str, mode: str) -> io.NodeOutput:
     from .encoder import decode_result
 
     frames, _ = decode_result(result.encode)
@@ -234,31 +234,59 @@ def _finish_gif(result: OptimiseResult, path: str, subfolder: str, filename: str
     report += f"\nsaved: output/{subfolder + '/' if subfolder else ''}{filename}"
     if sampled:
         report += f"\nnote: preview output holds {MAX_PREVIEW_FRAMES} evenly spaced frames of {len(frames)}"
-    return path, tensor, report, {"ui": _ui(subfolder, filename, result.stats(), mode), "result": (path, tensor, report)}
+    return io.NodeOutput(path, tensor, report, ui=_ui(subfolder, filename, result.stats(), mode))
 
 
 # ------------------------------------------------------------------ nodes
 
-class JWTFVideoToGif:
-    CATEGORY = CATEGORY
-    FUNCTION = "run"
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("STRING", "IMAGE", "STRING")
-    RETURN_NAMES = ("gif_path", "preview", "report")
+class JWTFVideoToGif(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFVideoToGif",
+            display_name='Video to GIF (Optimised)',
+            category='JezzWTF/gif',
+            inputs=[
+                io.Combo.Input("mode", options=list(MODES), default='balanced'),
+                io.String.Input("filename_prefix", default='gifs/clip', tooltip='Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/clip saves to output/gifs/clip_00001.gif.'),
+                io.Image.Input("images", optional=True),
+                io.Video.Input("video", optional=True),
+                io.Float.Input("source_fps", default=24.0, min=0.1, max=1000.0, step=0.1, optional=True, tooltip='Frame rate of the IMAGE batch (ignored for VIDEO).'),
+                io.Float.Input("fps", default=20.0, min=0.0, max=1000.0, step=0.5, optional=True, tooltip='Output frame rate; 0 = keep the source rate (capped at 50). 25, 20 and 12.5 give an even GIF cadence.'),
+                io.Float.Input("trim_start", default=0.0, min=0.0, max=36000.0, step=0.05, optional=True, tooltip='Seconds cut from the start (source time).'),
+                io.Float.Input("trim_end", default=0.0, min=0.0, max=36000.0, step=0.05, optional=True, tooltip='Seconds where the clip stops (0 = to the end).'),
+                io.Float.Input("speed", default=1.0, min=0.1, max=10.0, step=0.05, optional=True),
+                io.Int.Input("max_width", default=0, min=0, max=8192, step=1, optional=True, tooltip='0 = no limit. Never upscales.'),
+                io.Int.Input("max_height", default=0, min=0, max=8192, step=1, optional=True),
+                io.Combo.Input("resize_filter", options=['lanczos', 'bicubic', 'bilinear', 'box', 'nearest'], default='lanczos', optional=True),
+                io.Int.Input("crop_left", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("crop_top", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("crop_right", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("crop_bottom", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("loop_count", default=0, min=0, max=65535, optional=True, tooltip='0 = forever, 1 = play once, n = play n times.'),
+                io.Int.Input("colors", default=0, min=0, max=256, optional=True, tooltip='0 = by mode, otherwise 16-256.'),
+                io.Combo.Input("palette", options=['auto', 'global_full', 'global_diff', 'per_frame'], default='auto', optional=True),
+                io.Combo.Input("dither", options=['auto', 'none', 'bayer_1', 'bayer_2', 'bayer_3', 'bayer_4', 'bayer_5', 'sierra2_4a', 'floyd_steinberg'], default='auto', optional=True),
+                io.Float.Input("dedupe_threshold", default=-1.0, min=-1.0, max=20.0, step=0.05, optional=True, tooltip='-1 = by mode, 0 = exact duplicates only, else mean pixel difference (0-255) under which a frame merges into the previous one.'),
+                io.Boolean.Input("transparency_opt", default=True, optional=True, tooltip='Store only the changed rectangle of each frame.'),
+                io.Combo.Input("denoise", options=['auto', 'off', 'light', 'strong'], default='auto', optional=True),
+                io.Combo.Input("delay_mode", options=['exact', 'even'], default='exact', optional=True, tooltip='exact keeps real-time speed with mixed 10 ms steps; even snaps fps to a whole 10 ms period.'),
+                io.Float.Input("target_size_mb", default=2.0, min=0.05, max=512.0, step=0.05, optional=True, tooltip='Used by target_size mode.'),
+                io.Int.Input("max_trials", default=10, min=2, max=40, optional=True, tooltip='Encode attempts the target_size search may spend.'),
+                io.Float.Input("time_budget_s", default=120.0, min=5.0, max=3600.0, step=5.0, optional=True),
+                io.Boolean.Input("compare_naive", default=True, optional=True, tooltip='Also encode a naive one-liner GIF to report the saving.'),
+            ],
+            outputs=[
+                io.String.Output("gif_path"),
+                io.Image.Output("preview"),
+                io.String.Output("report"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        optional: dict[str, tuple[object, ...]] = {
-            "images": ("IMAGE", {}),
-            "video": ("VIDEO", {}),
-            "source_fps": ("FLOAT", {"default": 24.0, "min": 0.1, "max": 1000.0, "step": 0.1, "tooltip": "Frame rate of the IMAGE batch (ignored for VIDEO)."}),
-            "fps": ("FLOAT", {"default": 20.0, "min": 0.0, "max": 1000.0, "step": 0.5, "tooltip": "Output frame rate; 0 = keep the source rate (capped at 50). 25, 20 and 12.5 give an even GIF cadence."}),
-            **_optimise_widgets(),
-        }
-        return {"required": {"mode": (list(MODES), {"default": "balanced"}), "filename_prefix": ("STRING", {"default": "gifs/clip", "tooltip": "Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/clip saves to output/gifs/clip_00001.gif."})}, "optional": optional}
-
-    def run(self, mode: str, filename_prefix: str, images: torch.Tensor | None = None, video: object | None = None, source_fps: float = 24.0,
-            **kwargs: object) -> UIResult:
+    def execute(cls, mode: str, filename_prefix: str, images: torch.Tensor | None = None, video: object | None = None, source_fps: float = 24.0,
+            **kwargs: object) -> io.NodeOutput:
         warnings: list[str] = []
         if images is not None:
             if video is not None:
@@ -271,29 +299,55 @@ class JWTFVideoToGif:
             raise ValueError("connect an IMAGE batch or a VIDEO")
         values: dict[str, object] = {"mode": mode, **kwargs}
         result, path, subfolder, filename, _ = _run_optimise(source, _defaults(values), warnings, filename_prefix)
-        return _finish_gif(result, path, subfolder, filename, mode)[3]
+        return _finish_gif(result, path, subfolder, filename, mode)
 
 
-class JWTFGifOptimise:
-    CATEGORY = CATEGORY
-    FUNCTION = "run"
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("STRING", "IMAGE", "STRING")
-    RETURN_NAMES = ("gif_path", "preview", "report")
+class JWTFGifOptimise(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFGifOptimise",
+            display_name='GIF Optimise',
+            category='JezzWTF/gif',
+            inputs=[
+                io.Combo.Input("gif", options=[USE_PATH, *list_input_gifs()], upload=io.UploadType.image),
+                io.Combo.Input("mode", options=list(MODES), default='balanced'),
+                io.String.Input("filename_prefix", default='gifs/optimised', tooltip='Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/optimised saves to output/gifs/optimised_00001.gif.'),
+                io.String.Input("path", default='', optional=True, tooltip='Optional GIF path (inside input, output or temp). Overrides the picker, e.g. the output of another GIF node.'),
+                io.Float.Input("fps", default=0.0, min=0.0, max=1000.0, step=0.5, optional=True, tooltip="0 = keep the GIF's own frame timing."),
+                io.Float.Input("trim_start", default=0.0, min=0.0, max=36000.0, step=0.05, optional=True, tooltip='Seconds cut from the start (source time).'),
+                io.Float.Input("trim_end", default=0.0, min=0.0, max=36000.0, step=0.05, optional=True, tooltip='Seconds where the clip stops (0 = to the end).'),
+                io.Float.Input("speed", default=1.0, min=0.1, max=10.0, step=0.05, optional=True),
+                io.Int.Input("max_width", default=0, min=0, max=8192, step=1, optional=True, tooltip='0 = no limit. Never upscales.'),
+                io.Int.Input("max_height", default=0, min=0, max=8192, step=1, optional=True),
+                io.Combo.Input("resize_filter", options=['lanczos', 'bicubic', 'bilinear', 'box', 'nearest'], default='lanczos', optional=True),
+                io.Int.Input("crop_left", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("crop_top", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("crop_right", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("crop_bottom", default=0, min=0, max=8192, optional=True),
+                io.Int.Input("loop_count", default=0, min=0, max=65535, optional=True, tooltip='0 = forever, 1 = play once, n = play n times.'),
+                io.Int.Input("colors", default=0, min=0, max=256, optional=True, tooltip='0 = by mode, otherwise 16-256.'),
+                io.Combo.Input("palette", options=['auto', 'global_full', 'global_diff', 'per_frame'], default='auto', optional=True),
+                io.Combo.Input("dither", options=['auto', 'none', 'bayer_1', 'bayer_2', 'bayer_3', 'bayer_4', 'bayer_5', 'sierra2_4a', 'floyd_steinberg'], default='auto', optional=True),
+                io.Float.Input("dedupe_threshold", default=-1.0, min=-1.0, max=20.0, step=0.05, optional=True, tooltip='-1 = by mode, 0 = exact duplicates only, else mean pixel difference (0-255) under which a frame merges into the previous one.'),
+                io.Boolean.Input("transparency_opt", default=True, optional=True, tooltip='Store only the changed rectangle of each frame.'),
+                io.Combo.Input("denoise", options=['auto', 'off', 'light', 'strong'], default='auto', optional=True),
+                io.Combo.Input("delay_mode", options=['exact', 'even'], default='exact', optional=True, tooltip='exact keeps real-time speed with mixed 10 ms steps; even snaps fps to a whole 10 ms period.'),
+                io.Float.Input("target_size_mb", default=2.0, min=0.05, max=512.0, step=0.05, optional=True, tooltip='Used by target_size mode.'),
+                io.Int.Input("max_trials", default=10, min=2, max=40, optional=True, tooltip='Encode attempts the target_size search may spend.'),
+                io.Float.Input("time_budget_s", default=120.0, min=5.0, max=3600.0, step=5.0, optional=True),
+                io.Boolean.Input("compare_naive", default=True, optional=True, tooltip='Also encode a naive one-liner GIF to report the saving.'),
+            ],
+            outputs=[
+                io.String.Output("gif_path"),
+                io.Image.Output("preview"),
+                io.String.Output("report"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        optional: dict[str, tuple[object, ...]] = {
-            "path": ("STRING", {"default": "", "tooltip": "Optional GIF path (inside input, output or temp). Overrides the picker, e.g. the output of another GIF node."}),
-            "fps": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.5, "tooltip": "0 = keep the GIF's own frame timing."}),
-            **_optimise_widgets(),
-        }
-        return {"required": {"gif": ([USE_PATH, *list_input_gifs()], {"image_upload": True}),
-                             "mode": (list(MODES), {"default": "balanced"}),
-                             "filename_prefix": ("STRING", {"default": "gifs/optimised", "tooltip": "Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/optimised saves to output/gifs/optimised_00001.gif."})}, "optional": optional}
-
-    @classmethod
-    def IS_CHANGED(cls, gif: str = "", path: str = "", **_: object) -> str:
+    def fingerprint_inputs(cls, gif: str = "", path: str = "", **_: object) -> str:
         try:
             real = resolve_existing_file(path or gif, read_roots())
             st = os.stat(real)
@@ -301,7 +355,8 @@ class JWTFGifOptimise:
         except (ValueError, OSError):
             return "missing"
 
-    def run(self, gif: str, mode: str, filename_prefix: str, path: str = "", **kwargs: object) -> UIResult:
+    @classmethod
+    def execute(cls, gif: str, mode: str, filename_prefix: str, path: str = "", **kwargs: object) -> io.NodeOutput:
         chosen = path.strip() or ("" if gif == USE_PATH else gif)
         if not chosen:
             raise ValueError("GIF Optimise: pick a GIF, or connect a path (for example from Load GIF).")
@@ -311,7 +366,7 @@ class JWTFGifOptimise:
         result, out_path, subfolder, filename, _ = _run_optimise(source, _defaults(values), notes, filename_prefix)
         original = os.path.getsize(real)
         result.notes.append(f"source GIF {original:,} bytes -> {len(result.data):,} bytes ({(1 - len(result.data) / original) * 100:.1f}% saved)")
-        return _finish_gif(result, out_path, subfolder, filename, mode)[3]
+        return _finish_gif(result, out_path, subfolder, filename, mode)
 
 
 def _defaults(values: dict[str, object]) -> dict[str, object]:
@@ -324,29 +379,33 @@ def _defaults(values: dict[str, object]) -> dict[str, object]:
     return out
 
 
-class JWTFGifCompare:
-    CATEGORY = CATEGORY
-    FUNCTION = "run"
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("compare", "report")
+class JWTFGifCompare(io.ComfyNode):
     LAYOUTS = ("side_by_side", "split", "difference")
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {"layout": (list(cls.LAYOUTS), {"default": "side_by_side"})},
-            "optional": {
-                "gif_a": ("STRING", {"default": "", "tooltip": "Reference GIF path (input, output or temp folder). Relative names resolve under input."}),
-                "gif_b": ("STRING", {"default": "", "tooltip": "GIF to judge against A, e.g. an optimised result."}),
-                "images_a": ("IMAGE", {}),
-                "images_b": ("IMAGE", {}),
-                "fps_a": ("FLOAT", {"default": 20.0, "min": 0.1, "max": 1000.0, "step": 0.1, "tooltip": "Rate of images_a."}),
-                "fps_b": ("FLOAT", {"default": 20.0, "min": 0.1, "max": 1000.0, "step": 0.1, "tooltip": "Rate of images_b."}),
-                "sample_frames": ("INT", {"default": 24, "min": 1, "max": 400, "tooltip": "Frames of A measured for SSIM/PSNR (evenly spread)."}),
-                "output_frames": ("INT", {"default": 60, "min": 1, "max": 400, "tooltip": "Frames in the comparison image batch."}),
-            },
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFGifCompare",
+            display_name='GIF Analyse / Compare',
+            category='JezzWTF/gif',
+            description="Compare two GIFs or image batches: sizes, frame counts, SSIM and PSNR, with side-by-side, split or difference output.",
+            inputs=[
+                io.Combo.Input("layout", options=list(cls.LAYOUTS), default='side_by_side'),
+                io.String.Input("gif_a", default='', optional=True, tooltip='Reference GIF path (input, output or temp folder). Relative names resolve under input.'),
+                io.String.Input("gif_b", default='', optional=True, tooltip='GIF to judge against A, e.g. an optimised result.'),
+                io.Image.Input("images_a", optional=True),
+                io.Image.Input("images_b", optional=True),
+                io.Float.Input("fps_a", default=20.0, min=0.1, max=1000.0, step=0.1, optional=True, tooltip='Rate of images_a.'),
+                io.Float.Input("fps_b", default=20.0, min=0.1, max=1000.0, step=0.1, optional=True, tooltip='Rate of images_b.'),
+                io.Int.Input("sample_frames", default=24, min=1, max=400, optional=True, tooltip='Frames of A measured for SSIM/PSNR (evenly spread).'),
+                io.Int.Input("output_frames", default=60, min=1, max=400, optional=True, tooltip='Frames in the comparison image batch.'),
+            ],
+            outputs=[
+                io.Image.Output("compare"),
+                io.String.Output("report"),
+            ],
+            is_output_node=True,
+        )
 
     @staticmethod
     def _load(path: str, images: torch.Tensor | None, fps: float, label: str) -> tuple[list[Frame], list[float], int | None]:
@@ -358,16 +417,17 @@ class JWTFGifCompare:
         g = read_gif(real)
         return g.frames, g.durations, os.path.getsize(real)
 
-    def run(self, layout: str, gif_a: str = "", gif_b: str = "", images_a: torch.Tensor | None = None, images_b: torch.Tensor | None = None,
-            fps_a: float = 20.0, fps_b: float = 20.0, sample_frames: int = 24, output_frames: int = 60) -> dict[str, object]:
+    @classmethod
+    def execute(cls, layout: str, gif_a: str = "", gif_b: str = "", images_a: torch.Tensor | None = None, images_b: torch.Tensor | None = None,
+            fps_a: float = 20.0, fps_b: float = 20.0, sample_frames: int = 24, output_frames: int = 60) -> io.NodeOutput:
         from .frames import resize_frame
         from .quality import align
 
-        check_choice("layout", layout, self.LAYOUTS)
+        check_choice("layout", layout, cls.LAYOUTS)
         n_sample = check_int("sample_frames", sample_frames, 1, 400)
         n_out = check_int("output_frames", output_frames, 1, 400)
-        a_frames, a_durs, a_bytes = self._load(gif_a, images_a, check_float("fps_a", fps_a, 0.1, 1000.0), "A")
-        b_frames, b_durs, b_bytes = self._load(gif_b, images_b, check_float("fps_b", fps_b, 0.1, 1000.0), "B")
+        a_frames, a_durs, a_bytes = cls._load(gif_a, images_a, check_float("fps_a", fps_a, 0.1, 1000.0), "A")
+        b_frames, b_durs, b_bytes = cls._load(gif_b, images_b, check_float("fps_b", fps_b, 0.1, 1000.0), "B")
         report = compare_sequences(a_frames, a_durs, b_frames, b_durs, sample=n_sample)
         pairing = align(a_durs, b_durs)
         w, h = a_frames[0].shape[1], a_frames[0].shape[0]
@@ -388,7 +448,7 @@ class JWTFGifCompare:
             out.append(_compose(a, b, layout))
         tensor = frames_to_tensor(out)
         text = "\n".join(lines)
-        return {"ui": {"jwtf_gif_text": [text]}, "result": (tensor, text)}
+        return io.NodeOutput(tensor, text, ui={"jwtf_gif_text": [text]})
 
 
 def _compose(a: Frame, b: Frame, layout: str) -> Frame:
@@ -404,28 +464,34 @@ def _compose(a: Frame, b: Frame, layout: str) -> Frame:
     return np.clip(diff, 0, 255).astype(np.uint8)
 
 
-class JWTFLoadGif:
-    CATEGORY = CATEGORY
-    FUNCTION = "run"
-    # gif_path lets Load GIF feed GIF Optimise (path) and GIF Analyse / Compare (gif_a) directly.
-    RETURN_TYPES = ("IMAGE", "MASK", "FLOAT", "INT", "STRING", "STRING")
-    RETURN_NAMES = ("images", "mask", "fps", "frame_count", "delays_ms", "gif_path")
+class JWTFLoadGif(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFLoadGif",
+            display_name='Load GIF',
+            category='JezzWTF/gif',
+            inputs=[
+                io.Combo.Input("gif", options=list_input_gifs(), upload=io.UploadType.image),
+                io.String.Input("path", default='', optional=True, tooltip='Optional GIF path (input, output or temp). Overrides the picker.'),
+                io.Int.Input("max_frames", default=0, min=0, max=10000, optional=True, tooltip='0 = all frames.'),
+            ],
+            outputs=[
+                io.Image.Output("images"),
+                io.Mask.Output("mask"),
+                io.Float.Output("fps"),
+                io.Int.Output("frame_count"),
+                io.String.Output("delays_ms"),
+                io.String.Output("gif_path"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {"gif": (list_input_gifs(), {"image_upload": True})},
-            "optional": {
-                "path": ("STRING", {"default": "", "tooltip": "Optional GIF path (input, output or temp). Overrides the picker."}),
-                "max_frames": ("INT", {"default": 0, "min": 0, "max": 10000, "tooltip": "0 = all frames."}),
-            },
-        }
+    def fingerprint_inputs(cls, gif: str = "", path: str = "", **_: object) -> str:
+        return JWTFGifOptimise.fingerprint_inputs(gif, path)
 
     @classmethod
-    def IS_CHANGED(cls, gif: str = "", path: str = "", **_: object) -> str:
-        return JWTFGifOptimise.IS_CHANGED(gif, path)
-
-    def run(self, gif: str, path: str = "", max_frames: int = 0) -> tuple[torch.Tensor, torch.Tensor, float, int, str, str]:
+    def execute(cls, gif: str, path: str = "", max_frames: int = 0) -> io.NodeOutput:
         limit = check_int("max_frames", max_frames, 0, 10000)
         real = resolve_existing_file(path.strip() or gif, read_roots())
         g = read_gif(real)
@@ -435,38 +501,39 @@ class JWTFLoadGif:
         images = frames_to_tensor(frames)
         mask: NDArray[np.float32] = 1.0 - np.stack(alphas).astype(np.float32) / 255.0  # ComfyUI mask: 1 = transparent
         fps = len(durations) / sum(durations) if sum(durations) else 0.0
-        return (images, torch.from_numpy(mask), float(fps), len(frames),
-                json.dumps([round(d * 1000) for d in durations]), os.path.abspath(real))
+        return io.NodeOutput(images, torch.from_numpy(mask), float(fps), len(frames), json.dumps([round(d * 1000) for d in durations]), os.path.abspath(real))
 
 
-class JWTFFramesToAnimated:
-    CATEGORY = CATEGORY
-    FUNCTION = "run"
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("file_path", "report")
+class JWTFFramesToAnimated(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFFramesToAnimated",
+            display_name='Frames to Animated WebP / APNG',
+            category='JezzWTF/gif',
+            description="Encode an image batch as an animated WebP or APNG, optionally searching for the best quality under a size target.",
+            inputs=[
+                io.Image.Input("images"),
+                io.Float.Input("fps", default=20.0, min=0.1, max=240.0, step=0.5),
+                io.Combo.Input("format", options=list(FORMATS), default='webp'),
+                io.String.Input("filename_prefix", default='gifs/anim', tooltip='Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/anim saves to output/gifs/anim_00001.webp.'),
+                io.Boolean.Input("lossless", default=False, optional=True),
+                io.Int.Input("quality", default=80, min=0, max=100, optional=True, tooltip='WebP lossy quality; ignored when a target size is set.'),
+                io.Int.Input("method", default=4, min=0, max=6, optional=True, tooltip='WebP effort: 0 fast, 6 smallest.'),
+                io.Float.Input("dedupe_threshold", default=0.0, min=0.0, max=20.0, step=0.05, optional=True, tooltip='0 = merge exact duplicates only.'),
+                io.Float.Input("target_size_mb", default=0.0, min=0.0, max=512.0, step=0.05, optional=True, tooltip='0 = off. Lossy WebP searches the best quality that fits.'),
+                io.Int.Input("loop_count", default=0, min=0, max=65535, optional=True, tooltip='0 = forever.'),
+            ],
+            outputs=[
+                io.String.Output("file_path"),
+                io.String.Output("report"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "images": ("IMAGE", {}),
-                "fps": ("FLOAT", {"default": 20.0, "min": 0.1, "max": 240.0, "step": 0.5}),
-                "format": (list(FORMATS), {"default": "webp"}),
-                "filename_prefix": ("STRING", {"default": "gifs/anim", "tooltip": "Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/anim saves to output/gifs/anim_00001.webp."}),
-            },
-            "optional": {
-                "lossless": ("BOOLEAN", {"default": False}),
-                "quality": ("INT", {"default": 80, "min": 0, "max": 100, "tooltip": "WebP lossy quality; ignored when a target size is set."}),
-                "method": ("INT", {"default": 4, "min": 0, "max": 6, "tooltip": "WebP effort: 0 fast, 6 smallest."}),
-                "dedupe_threshold": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 20.0, "step": 0.05, "tooltip": "0 = merge exact duplicates only."}),
-                "target_size_mb": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 512.0, "step": 0.05, "tooltip": "0 = off. Lossy WebP searches the best quality that fits."}),
-                "loop_count": ("INT", {"default": 0, "min": 0, "max": 65535, "tooltip": "0 = forever."}),
-            },
-        }
-
-    def run(self, images: torch.Tensor, fps: float, format: str, filename_prefix: str, lossless: bool = False, quality: int = 80,
-            method: int = 4, dedupe_threshold: float = 0.0, target_size_mb: float = 0.0, loop_count: int = 0) -> UIResult:
+    def execute(cls, images: torch.Tensor, fps: float, format: str, filename_prefix: str, lossless: bool = False, quality: int = 80,
+            method: int = 4, dedupe_threshold: float = 0.0, target_size_mb: float = 0.0, loop_count: int = 0) -> io.NodeOutput:
         check_choice("format", format, FORMATS)
         rate = check_float("fps", fps, 0.1, 240.0)
         frames = tensor_to_frames(images)
@@ -479,23 +546,8 @@ class JWTFFramesToAnimated:
         ext = "webp" if format == "webp" else "png"
         path, subfolder, filename = save_bytes(res.data, filename_prefix, ext)
         report = res.report()
-        return {"ui": _ui(subfolder, filename, res.stats(), "animated"), "result": (path, report)}
+        return io.NodeOutput(path, report, ui=_ui(subfolder, filename, res.stats(), "animated"))
 
 
-NODE_CLASS_MAPPINGS = {
-    "JWTFVideoToGif": JWTFVideoToGif,
-    "JWTFGifOptimise": JWTFGifOptimise,
-    "JWTFGifCompare": JWTFGifCompare,
-    "JWTFLoadGif": JWTFLoadGif,
-    "JWTFFramesToAnimated": JWTFFramesToAnimated,
-}
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "JWTFVideoToGif": "Video to GIF (Optimised)",
-    "JWTFGifOptimise": "GIF Optimise",
-    "JWTFGifCompare": "GIF Analyse / Compare",
-    "JWTFLoadGif": "Load GIF",
-    "JWTFFramesToAnimated": "Frames to Animated WebP / APNG",
-}
-
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+NODES = [JWTFVideoToGif, JWTFGifOptimise, JWTFGifCompare, JWTFLoadGif, JWTFFramesToAnimated]

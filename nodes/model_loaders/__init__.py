@@ -6,30 +6,19 @@ from __future__ import annotations
 
 import importlib
 
+from comfy_api.latest import io
+
 from ._comfy import log
 
-NODE_CLASS_MAPPINGS: dict[str, type] = {}
-NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {}
+NODES: list[type[io.ComfyNode]] = []
 
-_NODES: tuple[tuple[str, str, str], ...] = (
-    ("diffusers_loader", "JWTFDiffusersLoader", "Diffusers Loader"),
-    ("lora_stack", "JWTFLoraStack", "LoRA Stack"),
-    ("lora_stack", "JWTFLoraFolderStack", "LoRA Folder Stack"),
-    ("lora_stack", "JWTFLoraFolderStackMulti", "LoRA Folder Stack (Multi-Model)"),
-    ("inspector", "JWTFLoraInspector", "LoRA Inspector"),
-    ("regional", "JWTFRegionalLoRA", "Regional Character LoRA"),
-    ("relay", "JWTFPromptRelayEncode", "Prompt Relay Encode"),
-    ("relay", "JWTFPromptRelayTimeline", "Prompt Relay Timeline"),
-    ("relay", "JWTFPromptRelayOptions", "Prompt Relay Options"),
-)
+_MODULES: tuple[str, ...] = ("diffusers_loader", "lora_stack", "inspector", "regional", "relay")
 
-for _module, _cls, _display in _NODES:
+for _module in _MODULES:
     try:
-        _mod = importlib.import_module(f".{_module}", __name__)
-        NODE_CLASS_MAPPINGS[_cls] = getattr(_mod, _cls)
-        NODE_DISPLAY_NAME_MAPPINGS[_cls] = _display
+        NODES.extend(importlib.import_module(f".{_module}", __name__).NODES)
     except Exception as _exc:  # pragma: no cover - surfaced in the ComfyUI log
-        log.warning("jezzwtf model_loaders: %s.%s unavailable: %s", _module, _cls, _exc)
+        log.warning("jezzwtf model_loaders: %s unavailable: %s", _module, _exc)
 
 try:
     from .routes import register_routes
@@ -38,4 +27,4 @@ try:
 except Exception as _exc:  # pragma: no cover
     log.warning("jezzwtf model_loaders: routes not registered: %s", _exc)
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODES"]

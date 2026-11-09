@@ -6,6 +6,7 @@ from utility_core.duration_frames import (
     FPS_EXPR, MINIMAX_EXPR, PRESETS, JWTFDurationFrames, eval_rows, resolve,
 )
 from utility_core.expr_eval import ExprError, evaluate, to_frames
+from v3_helpers import legacy
 
 
 # ------------------------------------------------------------ presets
@@ -41,10 +42,10 @@ def test_resolve_preset_wins_over_widgets() -> None:
 
 
 def test_node_output_and_ui() -> None:
-    out = JWTFDurationFrames().run(6.0, "24 FPS", "ignored", 99)
+    out = legacy(JWTFDurationFrames.execute(6.0, "24 FPS", "ignored", 99))
     assert out["result"] == (144, 6.0, 24.0, 24)
-    assert JWTFDurationFrames.RETURN_TYPES == ("INT", "FLOAT", "FLOAT", "INT")
-    assert JWTFDurationFrames.RETURN_NAMES == ("frames", "seconds", "fps", "fps_int")
+    assert tuple(JWTFDurationFrames.RETURN_TYPES) == ("INT", "FLOAT", "FLOAT", "INT")
+    assert tuple(JWTFDurationFrames.RETURN_NAMES) == ("frames", "seconds", "fps", "fps_int")
     assert isinstance(out["result"][2], float) and isinstance(out["result"][3], int)
     info = out["ui"]["jezzwtf_duration_frames"][0]
     assert info["frames"] == 144 and info["fps"] == 24 and info["expression"] == FPS_EXPR
@@ -52,7 +53,7 @@ def test_node_output_and_ui() -> None:
 
 def test_node_error_includes_expression() -> None:
     with pytest.raises(ValueError, match=r"expression: a / 0"):
-        JWTFDurationFrames().run(1.0, "Custom", "a / 0", 24)
+        legacy(JWTFDurationFrames.execute(1.0, "Custom", "a / 0", 24))
 
 
 def test_eval_rows() -> None:
@@ -148,11 +149,11 @@ def test_to_frames_limits() -> None:
 def test_fps_output_connects_to_a_float_frame_rate_input() -> None:
     """ComfyUI refuses INT -> FLOAT links, so the `fps` output must be the FLOAT Video Compare expects."""
     import os
-    import re
+    import sys
 
-    source = os.path.join(os.path.dirname(__file__), "..", "..", "nodes", "video_compare.py")
-    text = open(source, encoding="utf-8").read()
-    match = re.search(r'"frame_rate":\s*\("(\w+)"', text)
-    assert match is not None
-    fps_type = JWTFDurationFrames.RETURN_TYPES[JWTFDurationFrames.RETURN_NAMES.index("fps")]
-    assert fps_type == match.group(1)
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "nodes"))
+    from video_compare import VideoCompare
+
+    frame_rate = next(i for i in VideoCompare.GET_SCHEMA().inputs if i.id == "frame_rate")
+    fps_type = JWTFDurationFrames.RETURN_TYPES[list(JWTFDurationFrames.RETURN_NAMES).index("fps")]
+    assert fps_type == frame_rate.io_type

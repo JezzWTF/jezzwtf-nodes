@@ -11,8 +11,10 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 
+from comfy_api.latest import io
+
 from ._comfy import is_loopback_request, temp_dir
-from ._types import CATEGORY_DATASET, InputSpec, InputTypes, UIPayload
+from ._types import UIPayload
 from .folder_utils import (
     SORT_MODES, FrameSelector, caption_target, clean_path, fit_even, list_media, next_index, preview_name,
     resolve_index,
@@ -105,41 +107,41 @@ def load_image(path: str) -> tuple[torch.Tensor, torch.Tensor, Image.Image]:
     return image, mask, img
 
 
-def _auto_input(off_label: str) -> InputSpec:
-    return ("BOOLEAN", {"default": True, "label_on": "run whole folder", "label_off": off_label})
-
-
-def _common_inputs(off_label: str) -> dict[str, InputSpec]:
-    return {
-        "folder_path": ("STRING", {"default": ""}),
-        "sort_mode": (list(SORT_MODES),),
-        "index": ("INT", {"default": 0, "min": 0, "max": 16777215}),
-        "auto_run_folder": _auto_input(off_label),
-    }
-
-
-class JWTFFolderImageBatch:
-    CATEGORY = CATEGORY_DATASET
-    RETURN_TYPES = ("IMAGE", "MASK", "STRING", "STRING", "INT", "INT")
-    RETURN_NAMES = ("image", "mask", "filename", "path", "index", "total")
-    FUNCTION = "run"
+class JWTFFolderImageBatch(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFFolderImageBatch",
+            display_name='Folder Image Batch',
+            category='JezzWTF/dataset',
+            inputs=[
+                io.String.Input("folder_path", default=''),
+                io.Combo.Input("sort_mode", options=['numeric (001, 002, 10...)', 'alphabetical']),
+                io.Int.Input("index", default=0, min=0, max=16777215),
+                io.Boolean.Input("auto_run_folder", default=True, label_on='run whole folder', label_off='single image'),
+            ],
+            outputs=[
+                io.Image.Output("image"),
+                io.Mask.Output("mask"),
+                io.String.Output("filename"),
+                io.String.Output("path"),
+                io.Int.Output("index"),
+                io.Int.Output("total"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {"required": _common_inputs("single image")}
-
-    @classmethod
-    def IS_CHANGED(cls, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool) -> str | float:
+    def fingerprint_inputs(cls, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool) -> str | float:
         return _change_key(folder_path, sort_mode, index, auto_run_folder, "image")
 
-    def run(self, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool) -> dict[str, object]:
+    @classmethod
+    def execute(cls, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool) -> io.NodeOutput:
         files, idx = _resolve(folder_path, sort_mode, index, "image", auto_run_folder)
         path = files[idx]
         image, mask, img = load_image(path)
         preview = save_preview(img, path)
         stem = os.path.splitext(os.path.basename(path))[0]
-        return {"ui": _ui(preview, idx, len(files), auto_run_folder, path),
-                "result": (image, mask, stem, path, idx, len(files))}
+        return io.NodeOutput(image, mask, stem, path, idx, len(files), ui=_ui(preview, idx, len(files), auto_run_folder, path))
 
 
 # ---------------------------------------------------------------- video loading
@@ -270,35 +272,48 @@ def build_video(frames: torch.Tensor, audio: AudioDict, fps: float) -> object | 
         return None
 
 
-class JWTFFolderVideoBatch:
-    CATEGORY = CATEGORY_DATASET
-    RETURN_TYPES = ("IMAGE", "AUDIO", "STRING", "STRING", "INT", "INT", "FLOAT", "VIDEO")
-    RETURN_NAMES = ("frames", "audio", "filename", "path", "index", "total", "fps", "video")
-    FUNCTION = "run"
+class JWTFFolderVideoBatch(io.ComfyNode):
     OPTIONAL_KEYS = ("force_rate", "frame_load_cap", "skip_first_frames", "select_every_nth", "resize_longest_side")
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": _common_inputs("single video"),
-            "optional": {
-                "force_rate": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 120.0, "step": 0.5}),
-                "frame_load_cap": ("INT", {"default": 0, "min": 0, "max": 100000}),
-                "skip_first_frames": ("INT", {"default": 0, "min": 0, "max": 1000000}),
-                "select_every_nth": ("INT", {"default": 1, "min": 1, "max": 1000}),
-                "resize_longest_side": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 2}),
-            },
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFFolderVideoBatch",
+            display_name='Folder Video Batch',
+            category='JezzWTF/dataset',
+            inputs=[
+                io.String.Input("folder_path", default=''),
+                io.Combo.Input("sort_mode", options=['numeric (001, 002, 10...)', 'alphabetical']),
+                io.Int.Input("index", default=0, min=0, max=16777215),
+                io.Boolean.Input("auto_run_folder", default=True, label_on='run whole folder', label_off='single video'),
+                io.Float.Input("force_rate", default=0.0, min=0.0, max=120.0, step=0.5, optional=True),
+                io.Int.Input("frame_load_cap", default=0, min=0, max=100000, optional=True),
+                io.Int.Input("skip_first_frames", default=0, min=0, max=1000000, optional=True),
+                io.Int.Input("select_every_nth", default=1, min=1, max=1000, optional=True),
+                io.Int.Input("resize_longest_side", default=0, min=0, max=8192, step=2, optional=True),
+            ],
+            outputs=[
+                io.Image.Output("frames"),
+                io.Audio.Output("audio"),
+                io.String.Output("filename"),
+                io.String.Output("path"),
+                io.Int.Output("index"),
+                io.Int.Output("total"),
+                io.Float.Output("fps"),
+                io.Video.Output("video"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool,
+    def fingerprint_inputs(cls, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool,
                    **opts: object) -> str | float:
         extra = "".join(f"|{k}={opts[k]}" for k in sorted(opts))
         return _change_key(folder_path, sort_mode, index, auto_run_folder, "video", extra)
 
-    def run(self, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool, force_rate: float = 0.0,
+    @classmethod
+    def execute(cls, folder_path: str, sort_mode: str, index: int, auto_run_folder: bool, force_rate: float = 0.0,
             frame_load_cap: int = 0, skip_first_frames: int = 0, select_every_nth: int = 1,
-            resize_longest_side: int = 0) -> dict[str, object]:
+            resize_longest_side: int = 0) -> io.NodeOutput:
         files, idx = _resolve(folder_path, sort_mode, index, "video", auto_run_folder)
         path = files[idx]
         frames, fps, sel, used_av = decode_video(path, force_rate, frame_load_cap, skip_first_frames,
@@ -309,8 +324,7 @@ class JWTFFolderVideoBatch:
         preview = save_preview(first, path)
         video = build_video(frames, audio, fps)
         stem = os.path.splitext(os.path.basename(path))[0]
-        return {"ui": _ui(preview, idx, len(files), auto_run_folder, path),
-                "result": (frames, audio, stem, path, idx, len(files), float(fps), video)}
+        return io.NodeOutput(frames, audio, stem, path, idx, len(files), float(fps), video, ui=_ui(preview, idx, len(files), auto_run_folder, path))
 
 
 # ---------------------------------------------------------------- caption saver
@@ -329,35 +343,36 @@ def save_caption(text: str, image_path: str, save_location: str, custom_folder: 
     return target, True
 
 
-class JWTFSaveCaptionMatchImage:
-    CATEGORY = CATEGORY_DATASET
-    OUTPUT_NODE = True
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("saved_path",)
-    FUNCTION = "run"
+class JWTFSaveCaptionMatchImage(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFSaveCaptionMatchImage",
+            display_name='Save Caption (Match Image)',
+            category='JezzWTF/dataset',
+            inputs=[
+                io.String.Input("text", force_input=True),
+                io.String.Input("image_path", force_input=True),
+                io.Combo.Input("save_location", options=['next to image', 'custom folder']),
+                io.String.Input("custom_folder", default=''),
+                io.String.Input("extension", default='txt'),
+                io.Boolean.Input("overwrite", default=True, label_on='overwrite existing', label_off='skip if exists'),
+            ],
+            outputs=[
+                io.String.Output("saved_path"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "text": ("STRING", {"forceInput": True}),
-                "image_path": ("STRING", {"forceInput": True}),
-                "save_location": (["next to image", "custom folder"],),
-                "custom_folder": ("STRING", {"default": ""}),
-                "extension": ("STRING", {"default": "txt"}),
-                "overwrite": ("BOOLEAN", {"default": True, "label_on": "overwrite existing",
-                                          "label_off": "skip if exists"}),
-            }
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, **_: object) -> float:
+    def fingerprint_inputs(cls, **_: object) -> float:
         return float("nan")
 
-    def run(self, text: str, image_path: str, save_location: str, custom_folder: str, extension: str,
-            overwrite: bool) -> dict[str, object]:
+    @classmethod
+    def execute(cls, text: str, image_path: str, save_location: str, custom_folder: str, extension: str,
+            overwrite: bool) -> io.NodeOutput:
         path, _ = save_caption(text, image_path, save_location, custom_folder, extension, overwrite)
-        return {"ui": {"text": [path]}, "result": (path,)}
+        return io.NodeOutput(path, ui={"text": [path]})
 
 
 # ---------------------------------------------------------------- scan route
@@ -430,13 +445,4 @@ def register_routes(routes: "web.RouteTableDef") -> None:
         return web.json_response(result)
 
 
-NODE_CLASS_MAPPINGS = {
-    "JWTFFolderImageBatch": JWTFFolderImageBatch,
-    "JWTFFolderVideoBatch": JWTFFolderVideoBatch,
-    "JWTFSaveCaptionMatchImage": JWTFSaveCaptionMatchImage,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "JWTFFolderImageBatch": "Folder Image Batch",
-    "JWTFFolderVideoBatch": "Folder Video Batch",
-    "JWTFSaveCaptionMatchImage": "Save Caption (Match Image)",
-}
+NODES = [JWTFFolderImageBatch, JWTFFolderVideoBatch, JWTFSaveCaptionMatchImage]

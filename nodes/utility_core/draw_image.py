@@ -8,8 +8,9 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 
+from comfy_api.latest import io
+
 from ._comfy import input_dir
-from ._types import CATEGORY_IMAGE, InputTypes
 
 SUBFOLDER = "jezzwtf_draw"
 BACKGROUNDS = ("white", "black", "transparent")
@@ -46,26 +47,28 @@ def load_drawing(path: str, background: str) -> tuple[torch.Tensor, torch.Tensor
     return torch.from_numpy(np.ascontiguousarray(rgb))[None], torch.from_numpy(1.0 - alpha)[None]
 
 
-class JWTFDrawImage:
-    CATEGORY = CATEGORY_IMAGE
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "run"
+class JWTFDrawImage(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFDrawImage",
+            display_name='Draw Image',
+            category='JezzWTF/image',
+            inputs=[
+                io.Int.Input("width", default=1024, min=64, max=8192, step=8),
+                io.Int.Input("height", default=1024, min=64, max=8192, step=8),
+                io.Combo.Input("background", options=list(BACKGROUNDS), default='white'),
+                io.String.Input("image", default=''),
+                io.String.Input("drawing_state", default=''),
+            ],
+            outputs=[
+                io.Image.Output("image"),
+                io.Mask.Output("mask"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
-                "height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
-                "background": (list(BACKGROUNDS), {"default": "white"}),
-                "image": ("STRING", {"default": ""}),
-                "drawing_state": ("STRING", {"default": ""}),
-            }
-        }
-
-    @classmethod
-    def IS_CHANGED(cls, width: int, height: int, background: str, image: str = "", drawing_state: str = "") -> str:
+    def fingerprint_inputs(cls, width: int, height: int, background: str, image: str = "", drawing_state: str = "") -> str:
         path = resolve_input_file(image)
         if path is None:
             return f"blank-{width}x{height}-{background}"
@@ -76,13 +79,13 @@ class JWTFDrawImage:
         h.update(background.encode("utf-8"))
         return h.hexdigest()
 
-    def run(self, width: int, height: int, background: str, image: str = "",
-            drawing_state: str = "") -> tuple[torch.Tensor, torch.Tensor]:
+    @classmethod
+    def execute(cls, width: int, height: int, background: str, image: str = "",
+            drawing_state: str = "") -> io.NodeOutput:
         path = resolve_input_file(image)
         if path is None:
-            return blank(width, height, background)
-        return load_drawing(path, background)
+            return io.NodeOutput(*blank(width, height, background))
+        return io.NodeOutput(*load_drawing(path, background))
 
 
-NODE_CLASS_MAPPINGS = {"JWTFDrawImage": JWTFDrawImage}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFDrawImage": "Draw Image"}
+NODES = [JWTFDrawImage]

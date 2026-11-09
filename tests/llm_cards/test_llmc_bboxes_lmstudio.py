@@ -12,6 +12,7 @@ import torch
 from nodes.llm_cards import bboxes as bb
 from nodes.llm_cards import layout_prompt as lp
 from nodes.llm_cards import lmstudio as lms
+from v3_helpers import legacy, legacy_h
 
 # --------------------------------------------------------------------------- LLM JSON extraction
 
@@ -91,12 +92,12 @@ def test_editor_state_parsing():
 def test_node_upstream_vs_canvas():
     node = bb.JWTFBoundingBoxes()
     state = json.dumps({"regions": [{"x": 0, "y": 0, "w": 0.5, "h": 0.5, "type": "obj"}]})
-    out = node.run(512, 256, bboxes=ELEMENTS[:1], editor_state=state, last_incoming="")
+    out = legacy(node.execute(512, 256, bboxes=ELEMENTS[:1], editor_state=state, last_incoming=""))
     preview, frames, elements = out["result"]
     assert tuple(preview.shape) == (1, 256, 512, 3) and preview.dtype == torch.float32
     assert elements[0]["type"] == "text"  # upstream changed -> regions from the input
     key = out["ui"]["input_key"][0]
-    out2 = node.run(1024, 512, bboxes=ELEMENTS[:1], editor_state=state, last_incoming=key)
+    out2 = legacy(node.execute(1024, 512, bboxes=ELEMENTS[:1], editor_state=state, last_incoming=key))
     assert out2["result"][2][0]["type"] == "obj"  # canvas edits win; resize is not an upstream change
     assert out2["result"][1] == [[{"x": 0, "y": 0, "width": 512, "height": 256}]]
 
@@ -219,9 +220,9 @@ def test_node_run_success_and_error(monkeypatch):
         return "reply", 1
 
     monkeypatch.setattr(lms, "run_completion", fake_completion)
-    node = lms.JWTFLMStudio()
-    out = node.run("http://x:1/", "", "sys", "gen", 0, 0.7, 0.95, True, 0, "512", 8,
-                   image=torch.rand(1, 4, 4, 3), prompt_override="over", unique_id="7")
+    node = lms.JWTFLMStudio
+    out = legacy_h(node, "7", lambda: node.execute("http://x:1/", "", "sys", "gen", 0, 0.7, 0.95, True, 0, "512", 8,
+                   image=torch.rand(1, 4, 4, 3), prompt_override="over"))
     assert out["result"] == ("reply", "over") and out["ui"]["text"] == ["reply"]
     assert captured["base"] == "http://x:1"
     content = captured["payload"]["messages"][1]["content"]
@@ -236,9 +237,9 @@ def test_node_run_success_and_error(monkeypatch):
 
     monkeypatch.setattr(lms, "run_completion", boom)
     events.clear()
-    out = node.run("", "m", "", "hello", 512, 0.7, 0.95, False, 0, "1024", 8, video="missing.mp4")
+    out = legacy_h(node, None, lambda: node.execute("", "m", "", "hello", 512, 0.7, 0.95, False, 0, "1024", 8, video="missing.mp4"))
     assert "refused" in out["result"][0] and lms.DEFAULT_URL in out["result"][0]
     assert out["result"][1] == "hello"
     assert events[-1][1]["state"] == "error" and events[-1][1]["node"] == "-1"
-    assert lms.JWTFLMStudio.IS_CHANGED() != lms.JWTFLMStudio.IS_CHANGED()  # NaN
-    assert np.isnan(lms.JWTFLMStudio.IS_CHANGED())
+    assert lms.JWTFLMStudio.fingerprint_inputs() != lms.JWTFLMStudio.fingerprint_inputs()  # NaN
+    assert np.isnan(lms.JWTFLMStudio.fingerprint_inputs())

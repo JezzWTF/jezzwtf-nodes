@@ -52,3 +52,11 @@ def no_gpu_model_loading(monkeypatch: pytest.MonkeyPatch) -> None:
     mm = _comfy.optional_module("comfy.model_management")
     if mm is not None and hasattr(mm, "load_models_gpu"):
         monkeypatch.setattr(mm, "load_models_gpu", lambda *args, **kwargs: None)
+
+_TESTS = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _TESTS not in sys.path:
+    sys.path.insert(0, _TESTS)
+
+import v3_helpers  # noqa: E402
+
+v3_helpers.install_default_hidden()

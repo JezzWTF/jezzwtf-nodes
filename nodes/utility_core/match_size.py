@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import torch
 
+from comfy_api.latest import io
+
 from ._comfy import upscale
-from ._types import CATEGORY_IMAGE, InputTypes
 
 RESIZE_TYPES = (
     "scale dimensions", "fit within", "fill (crop)", "pad to",
@@ -101,36 +102,38 @@ def match_size(inp: torch.Tensor, resize_type: str, scale_method: str, reference
     return image, y[:, 0].contiguous(), int(y.shape[-1]), int(y.shape[-2])
 
 
-class JWTFMatchImageSize:
-    CATEGORY = CATEGORY_IMAGE
-    RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT")
-    RETURN_NAMES = ("image", "mask", "width", "height")
-    FUNCTION = "run"
+class JWTFMatchImageSize(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFMatchImageSize",
+            display_name='Match Image Size',
+            category='JezzWTF/image',
+            inputs=[
+                io.Custom("IMAGE,MASK").Input("input"),
+                io.Combo.Input("resize_type", options=list(RESIZE_TYPES), default='scale dimensions'),
+                io.Combo.Input("scale_method", options=list(SCALE_METHODS), default='lanczos'),
+                io.Custom("IMAGE,MASK").Input("reference_image", optional=True),
+                io.Int.Input("width", default=0, min=0, max=16384, optional=True),
+                io.Int.Input("height", default=0, min=0, max=16384, optional=True),
+                io.Combo.Input("crop", options=['center', 'disabled'], default='center', optional=True),
+                io.String.Input("pad_color", default='#000000', optional=True),
+                io.Int.Input("round_to", default=1, min=1, max=128, optional=True),
+            ],
+            outputs=[
+                io.Image.Output("image"),
+                io.Mask.Output("mask"),
+                io.Int.Output("width"),
+                io.Int.Output("height"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        return {
-            "required": {
-                "input": ("IMAGE,MASK",),
-                "resize_type": (list(RESIZE_TYPES), {"default": "scale dimensions"}),
-                "scale_method": (list(SCALE_METHODS), {"default": "lanczos"}),
-            },
-            "optional": {
-                "reference_image": ("IMAGE,MASK",),
-                "width": ("INT", {"default": 0, "min": 0, "max": 16384}),
-                "height": ("INT", {"default": 0, "min": 0, "max": 16384}),
-                "crop": (["center", "disabled"], {"default": "center"}),
-                "pad_color": ("STRING", {"default": "#000000"}),
-                "round_to": ("INT", {"default": 1, "min": 1, "max": 128}),
-            },
-        }
-
-    def run(self, input: torch.Tensor, resize_type: str, scale_method: str,  # noqa: A002 - socket name
+    def execute(cls, input: torch.Tensor, resize_type: str, scale_method: str,  # noqa: A002 - socket name
             reference_image: torch.Tensor | None = None, width: int = 0, height: int = 0,
             crop: str = "center", pad_color: str = "#000000", round_to: int = 1
-            ) -> tuple[torch.Tensor, torch.Tensor, int, int]:
-        return match_size(input, resize_type, scale_method, reference_image, width, height, crop, pad_color, round_to)
+            ) -> io.NodeOutput:
+        return io.NodeOutput(*match_size(input, resize_type, scale_method, reference_image, width, height, crop, pad_color, round_to))
 
 
-NODE_CLASS_MAPPINGS = {"JWTFMatchImageSize": JWTFMatchImageSize}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFMatchImageSize": "Match Image Size"}
+NODES = [JWTFMatchImageSize]

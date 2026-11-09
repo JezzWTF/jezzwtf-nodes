@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from comfy_api.latest import io
+
 from . import character_chat as _character_chat
 from . import lmstudio as _lmstudio
 from .bakers import JWTFV2PNGBaker, JWTFWorkflowPNGBaker
@@ -11,25 +13,15 @@ from .common import register_routes
 from .layout_prompt import JWTFLayoutLLMPrompt
 from .lmstudio import JWTFLMStudio, JWTFLMStudioPromptBox
 
-NODE_CLASS_MAPPINGS = {
-    "JWTFLMStudio": JWTFLMStudio,
-    "JWTFLMStudioPromptBox": JWTFLMStudioPromptBox,
-    "JWTFLayoutLLMPrompt": JWTFLayoutLLMPrompt,
-    "JWTFBoundingBoxes": JWTFBoundingBoxes,
-    "JWTFV2PNGBaker": JWTFV2PNGBaker,
-    "JWTFWorkflowPNGBaker": JWTFWorkflowPNGBaker,
-    "JWTFCharacterChat": JWTFCharacterChat,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "JWTFLMStudio": "LM Studio Bridge",
-    "JWTFLMStudioPromptBox": "LM Studio Prompt Box",
-    "JWTFLayoutLLMPrompt": "Layout LLM Prompt",
-    "JWTFBoundingBoxes": "Bounding Boxes",
-    "JWTFV2PNGBaker": "Character Card PNG Baker",
-    "JWTFWorkflowPNGBaker": "Workflow PNG Baker",
-    "JWTFCharacterChat": "Character Chat",
-}
+NODES: list[type[io.ComfyNode]] = [
+    JWTFLMStudio,
+    JWTFLMStudioPromptBox,
+    JWTFLayoutLLMPrompt,
+    JWTFBoundingBoxes,
+    JWTFV2PNGBaker,
+    JWTFWorkflowPNGBaker,
+    JWTFCharacterChat,
+]
 
 
 def _register_all(routes: object) -> None:
@@ -39,4 +31,4 @@ def _register_all(routes: object) -> None:
 
 ROUTES_REGISTERED = register_routes(_register_all)
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODES"]

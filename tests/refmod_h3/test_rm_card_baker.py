@@ -14,6 +14,7 @@ from safetensors import safe_open
 from refmod_h3 import _comfy, bundle, card_baker
 from refmod_h3._types import RefModError
 from refmod_h3.bundle import RefMod
+from v3_helpers import legacy
 
 CARD = {"spec": "chara_card_v2", "spec_version": "2.0",
         "data": {"name": "Alice", "description": "curious", "first_mes": "hi", "personality": "kind"}}
@@ -140,10 +141,10 @@ def test_node_end_to_end_hybrid(base_file: str, tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(_comfy, "output_dir", lambda: out_dir)
     monkeypatch.setattr(_comfy, "temp_dir", lambda: tmp_dir)
     image = torch.rand(1, 64, 48, 3)
-    res = card_baker.JWTFRefmodCardBaker().bake(image, json.dumps(CARD), "Refmods/%name%",
+    res = legacy(card_baker.JWTFRefmodCardBaker.execute(image, json.dumps(CARD), "Refmods/%name%",
                                                  card_baker.NONE_CHOICE, 64, True,
                                                  system_prompt="Stay in character.", base_refmod_path=base_file,
-                                                 save_to=card_baker.SAVE_TO_OUTPUT)
+                                                 save_to=card_baker.SAVE_TO_OUTPUT))
     dst, name = res["result"]
     assert name == "Alice" and os.path.isfile(dst) and dst.startswith(out_dir)
     assert data_section(dst) == data_section(base_file)
@@ -154,13 +155,13 @@ def test_node_end_to_end_hybrid(base_file: str, tmp_path: Path, monkeypatch: pyt
     preview = res["ui"]["card_preview"][0]
     assert preview["type"] == "temp" and os.path.isfile(os.path.join(tmp_dir, preview["filename"]))
     # character-only
-    res2 = card_baker.JWTFRefmodCardBaker().bake(image, json.dumps(CARD), "Refmods/%name%",
+    res2 = legacy(card_baker.JWTFRefmodCardBaker.execute(image, json.dumps(CARD), "Refmods/%name%",
                                                   card_baker.NONE_CHOICE, 64, True,
-                                                  save_to=card_baker.SAVE_TO_OUTPUT)
+                                                  save_to=card_baker.SAVE_TO_OUTPUT))
     assert res2["ui"]["card_info"][0]["refmod"]["kind"] == "character-only"
     with pytest.raises(RefModError, match="base_refmod_path not found"):
-        card_baker.JWTFRefmodCardBaker().bake(image, json.dumps(CARD), "x", card_baker.NONE_CHOICE, 64, True,
-                                               base_refmod_path=os.path.join(str(tmp_path), "nope.safetensors"))
+        legacy(card_baker.JWTFRefmodCardBaker.execute(image, json.dumps(CARD), "x", card_baker.NONE_CHOICE, 64, True,
+                                               base_refmod_path=os.path.join(str(tmp_path), "nope.safetensors")))
 
 
 def test_rebaking_with_a_blank_prompt_drops_the_stale_prompt(base_file: str, tmp_path: Path,
@@ -171,12 +172,12 @@ def test_rebaking_with_a_blank_prompt_drops_the_stale_prompt(base_file: str, tmp
     monkeypatch.setattr(_comfy, "output_dir", lambda: out_dir)
     monkeypatch.setattr(_comfy, "temp_dir", lambda: tmp_dir)
     image = torch.rand(1, 64, 48, 3)
-    node = card_baker.JWTFRefmodCardBaker()
-    first = node.bake(image, json.dumps(CARD), "first", card_baker.NONE_CHOICE, 64, True,
-                      system_prompt="Stay in character.", base_refmod_path=base_file)["result"][0]
+    node = card_baker.JWTFRefmodCardBaker
+    first = legacy(node.execute(image, json.dumps(CARD), "first", card_baker.NONE_CHOICE, 64, True,
+                      system_prompt="Stay in character.", base_refmod_path=base_file))["result"][0]
     assert card_baker.read_character(first)[1] == "Stay in character."
-    second = node.bake(image, json.dumps(CARD), "second", card_baker.NONE_CHOICE, 64, True,
-                       system_prompt="", base_refmod_path=first)["result"][0]
+    second = legacy(node.execute(image, json.dumps(CARD), "second", card_baker.NONE_CHOICE, 64, True,
+                       system_prompt="", base_refmod_path=first))["result"][0]
     assert card_baker.read_character(second)[1] == ""
     header, _ = bundle.read_header(second)
     assert card_baker.KEY_PROMPT not in header["__metadata__"]
@@ -204,8 +205,8 @@ def test_default_save_goes_to_the_refmods_folder(tmp_path: Path, monkeypatch: py
     os.makedirs(out_dir)
     monkeypatch.setattr(_comfy, "output_dir", lambda: out_dir)
     monkeypatch.setattr(_comfy, "temp_dir", lambda: str(tmp_path))
-    res = card_baker.JWTFRefmodCardBaker().bake(torch.rand(1, 64, 48, 3), json.dumps(CARD), "%name%",
-                                                 card_baker.NONE_CHOICE, 64, True)
+    res = legacy(card_baker.JWTFRefmodCardBaker.execute(torch.rand(1, 64, 48, 3), json.dumps(CARD), "%name%",
+                                                 card_baker.NONE_CHOICE, 64, True))
     dst = res["result"][0]
     assert os.path.dirname(dst) == root and os.path.isfile(dst)
     assert not os.listdir(out_dir)

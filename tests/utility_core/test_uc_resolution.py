@@ -5,6 +5,7 @@ import pytest
 from utility_core.resolution import (
     ASPECT_LABELS, PRESET_LABELS, JWTFResolutionPicker, compute_resolution, parse_ratio, parse_size, snap,
 )
+from v3_helpers import legacy
 
 
 def test_label_parsing() -> None:
@@ -51,8 +52,8 @@ def test_preset_mode() -> None:
 
 
 def test_node_latent() -> None:
-    w, h, latent = JWTFResolutionPicker().run("Preset Resolution", "1:1 (Square)", 16, 9, 1, "640x360 (16:9 nHD)",
-                                              False, 32, False, 3)
+    w, h, latent = legacy(JWTFResolutionPicker.execute("Preset Resolution", "1:1 (Square)", 16, 9, 1, "640x360 (16:9 nHD)",
+                                              False, 32, False, 3))
     assert (w, h) == (640, 360)
     assert tuple(latent["samples"].shape) == (3, 4, 45, 80)
     assert latent["downscale_ratio_spacial"] == 8

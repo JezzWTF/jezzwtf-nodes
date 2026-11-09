@@ -5,13 +5,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import inspect
-import io
 import json
 import os
 import time
 from typing import Mapping
 
 from PIL import Image
+
+from io import BytesIO
+
+from comfy_api.latest import io
 
 from .character import (
     PLACEHOLDER,
@@ -33,7 +36,7 @@ from .character import (
     substitute,
     video_frame_indices,
 )
-from .common import CATEGORY_LLM, MAX_IMAGES, linspace_indices, pil_to_tensor, safe_name
+from .common import MAX_IMAGES, linspace_indices, pil_to_tensor, safe_name
 
 TAG = "[JezzWTF Character Chat]"
 MTP_MODES = ["auto", "off", "2", "3", "4", "5", "tree2s1", "tree2s2", "tree3s1", "tree4s1m8"]
@@ -97,7 +100,7 @@ def avatar_tensor(loaded: LoadedCard) -> "torch.Tensor":  # noqa: F821
     data = loaded["avatar_png"]
     if data and not loaded["path"].lower().endswith(".json"):
         try:
-            with Image.open(io.BytesIO(data)) as img:
+            with Image.open(BytesIO(data)) as img:
                 return pil_to_tensor(img.convert("RGB"))
         except Exception as exc:  # noqa: BLE001 - fall back to the placeholder
             print(f"{TAG} avatar could not be read: {exc}")
@@ -125,10 +128,10 @@ def avatar_thumbnail(loaded: LoadedCard, size: int = 96) -> str:
     if not data or loaded["path"].lower().endswith(".json"):
         return ""
     try:
-        with Image.open(io.BytesIO(data)) as img:
+        with Image.open(BytesIO(data)) as img:
             thumb = img.convert("RGB")
             thumb.thumbnail((size, size))
-            buf = io.BytesIO()
+            buf = BytesIO()
             thumb.save(buf, "JPEG", quality=80)
     except Exception:  # noqa: BLE001 - header just shows no avatar
         return ""
@@ -191,49 +194,52 @@ def supported_generate_kwargs(generate: object, kwargs: Mapping[str, object]) ->
 # --------------------------------------------------------------------------- node
 
 
-class JWTFCharacterChat:
-    CATEGORY = CATEGORY_LLM
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "IMAGE", "STRING")
-    RETURN_NAMES = ("reply", "chat_log", "character_name", "description", "avatar", "history_json")
-    FUNCTION = "chat"
-    OUTPUT_NODE = True
+class JWTFCharacterChat(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFCharacterChat",
+            display_name='Character Chat',
+            category='JezzWTF/LLM',
+            inputs=[
+                io.Clip.Input("clip"),
+                io.Combo.Input("character", options=list_choices()),
+                io.String.Input("user_name", default='User'),
+                io.Int.Input("max_length", default=512, min=1, max=32768),
+                io.Float.Input("temperature", default=0.7, min=0.01, max=2.0, step=0.01),
+                io.Float.Input("top_p", default=0.95, min=0.0, max=1.0, step=0.01),
+                io.Int.Input("top_k", default=64, min=0, max=1000),
+                io.Float.Input("min_p", default=0.05, min=0.0, max=1.0, step=0.01),
+                io.Float.Input("repetition_penalty", default=1.05, min=0.0, max=5.0, step=0.01),
+                io.Int.Input("seed", default=0, min=0, max=18446744073709551615, control_after_generate=True),
+                io.Boolean.Input("thinking", default=False),
+                io.Int.Input("context_messages", default=40, min=2, max=400),
+                io.String.Input("card_path", default='', optional=True),
+                io.String.Input("action", default='none', optional=True),
+                io.String.Input("user_message", default='', optional=True),
+                io.String.Input("history_json", default='[]', optional=True),
+                io.Float.Input("presence_penalty", default=0.0, min=0.0, max=5.0, step=0.01, optional=True),
+                io.Combo.Input("mtp", options=MTP_MODES, default='auto', optional=True),
+                io.Int.Input("video_max_frames", default=8, min=1, max=64, optional=True),
+                io.Image.Input("image", optional=True),
+                io.Audio.Input("audio", optional=True),
+                io.Video.Input("video", optional=True),
+                io.String.Input("system_prompt", multiline=True, optional=True, force_input=True),
+                io.Combo.Input("sampling_mode", options=['on', 'off'], default='on', optional=True),
+            ],
+            outputs=[
+                io.String.Output("reply"),
+                io.String.Output("chat_log"),
+                io.String.Output("character_name"),
+                io.String.Output("description"),
+                io.Image.Output("avatar"),
+                io.String.Output("history_json"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "clip": ("CLIP",),
-                "character": (list_choices(),),
-                "user_name": ("STRING", {"default": "User"}),
-                "max_length": ("INT", {"default": 512, "min": 1, "max": 32768}),
-                "temperature": ("FLOAT", {"default": 0.7, "min": 0.01, "max": 2.0, "step": 0.01}),
-                "top_p": ("FLOAT", {"default": 0.95, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "top_k": ("INT", {"default": 64, "min": 0, "max": 1000}),
-                "min_p": ("FLOAT", {"default": 0.05, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "repetition_penalty": ("FLOAT", {"default": 1.05, "min": 0.0, "max": 5.0, "step": 0.01}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "control_after_generate": True}),
-                "thinking": ("BOOLEAN", {"default": False}),
-                "context_messages": ("INT", {"default": 40, "min": 2, "max": 400}),
-            },
-            # Order matters: widget values are restored by position.
-            "optional": {
-                "card_path": ("STRING", {"default": ""}),
-                "action": ("STRING", {"default": "none"}),
-                "user_message": ("STRING", {"default": ""}),
-                "history_json": ("STRING", {"default": "[]"}),
-                "presence_penalty": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 5.0, "step": 0.01}),
-                "mtp": (MTP_MODES, {"default": "auto"}),
-                "video_max_frames": ("INT", {"default": 8, "min": 1, "max": 64}),
-                "image": ("IMAGE",),
-                "audio": ("AUDIO",),
-                "video": ("VIDEO",),
-                "system_prompt": ("STRING", {"forceInput": True, "multiline": True}),
-                "sampling_mode": (["on", "off"], {"default": "on"}),
-            },
-        }
-
-    def chat(
-        self,
+    def execute(cls,
         clip: object,
         character: str,
         user_name: str,
@@ -258,7 +264,7 @@ class JWTFCharacterChat:
         video: object = None,
         system_prompt: str | None = None,
         sampling_mode: str = "on",
-    ) -> dict[str, object]:
+    ) -> io.NodeOutput:
         try:
             loaded = load_selected(character, card_path, allow_explicit=True)
         except CardReadError as exc:
@@ -272,7 +278,7 @@ class JWTFCharacterChat:
         reply = ""
         stats: dict[str, float | int] | None = None
         if generate:
-            reply, stats = self._generate(clip, card, user, history, context_messages, thinking, image, audio,
+            reply, stats = cls._generate(clip, card, user, history, context_messages, thinking, image, audio,
                                           video, video_max_frames, system_prompt, sampling_mode, max_length,
                                           temperature, top_k, top_p, min_p, repetition_penalty,
                                           presence_penalty, seed, mtp)
@@ -284,13 +290,10 @@ class JWTFCharacterChat:
         payload = json.dumps({"history": history, "reply": reply, "generated": generate, "stats": stats,
                               "card": {**card_info(loaded, user), "avatar": avatar_thumbnail(loaded)}},
                              ensure_ascii=False)
-        return {
-            "ui": {"jwtf_chat": [payload]},
-            "result": (reply, chat_log(history, char, user), char, substitute(card["description"], char, user),
-                       avatar_tensor(loaded), history_out),
-        }
+        return io.NodeOutput(reply, chat_log(history, char, user), char, substitute(card["description"], char, user), avatar_tensor(loaded), history_out, ui={"jwtf_chat": [payload]})
 
-    def _generate(self, clip: object, card: NormalizedCard, user: str, history: list[Message],
+    @classmethod
+    def _generate(cls, clip: object, card: NormalizedCard, user: str, history: list[Message],
                   context_messages: int, thinking: bool, image: object, audio: Mapping[str, object] | None,
                   video: object, video_max_frames: int, system_prompt: str | None, sampling_mode: str,
                   max_length: int, temperature: float, top_k: int, top_p: float, min_p: float,
@@ -406,3 +409,6 @@ def register(routes: object) -> None:
     routes.post("/jezzwtf/character/save_chat")(save_chat)  # type: ignore[attr-defined]
     routes.get("/jezzwtf/character/info")(info)  # type: ignore[attr-defined]
     routes.get("/jezzwtf/character/avatar")(avatar)  # type: ignore[attr-defined]
+
+
+NODES = [JWTFCharacterChat]

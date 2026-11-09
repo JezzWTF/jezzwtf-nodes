@@ -11,8 +11,10 @@ import sys
 
 import torch
 
+from comfy_api.latest import io
+
 from . import _comfy
-from ._types import CATEGORY_SAMPLING, InputTypes, RefModError
+from ._types import RefModError
 from .preview import attach_preview
 
 log = logging.getLogger("jezzwtf.refmod_h3")
@@ -198,33 +200,18 @@ def decode_audio_latent(latent: Latent, audio_vae: object) -> dict[str, object]:
 
 def finish(latent: Latent, denoised: Latent | None, do_decode: bool, vae: object | None,
            audio_vae: object | None, tiled: bool, unique_id: object, dynprompt: object
-           ) -> dict[str, object]:
+           ) -> io.NodeOutput:
     image, audio = placeholder_image(), silent_audio()
     if do_decode:
         emit_phase(unique_id, dynprompt, "decoding")
         image, audio = decode_latent(latent, vae, audio_vae, tiled)
     emit_phase(unique_id, dynprompt, "done")
     node, _ = node_ids(unique_id, dynprompt)
-    return {"ui": {SOURCE_KEY: [node]},
-            "result": (latent, denoised if denoised is not None else latent, image, audio)}
+    return io.NodeOutput(latent, denoised if denoised is not None else latent, image, audio,
+                         ui={SOURCE_KEY: [node]})
 
 
 # --------------------------------------------------------------------------- shared inputs
-
-def preview_optional() -> dict[str, tuple[object, ...]]:
-    tiny = ["none"] + _comfy.filename_list("vae_approx")
-    return {
-        "preview": ("BOOLEAN", {"default": True}),
-        "preview_max_res": ("INT", {"default": 1024, "min": 0, "max": 8192, "step": 8}),
-        "preview_frames": ("INT", {"default": 1, "min": 1, "max": 1024}),
-        "preview_jpeg_quality": ("INT", {"default": 80, "min": 30, "max": 100}),
-        "preview_tiny_vae": (tiny, {"default": "none"}),
-    }
-
-
-def _hidden() -> dict[str, str]:
-    return {"unique_id": "UNIQUE_ID", "dynprompt": "DYNPROMPT"}
-
 
 def _maybe_preview(model: object, preview: bool, max_res: int, quality: int, frames: int, fps: int,
                    tiny: str, vae: object | None, audio_vae: object | None, unique_id: object,
@@ -260,57 +247,63 @@ def run_custom_advanced(noise: object, guider: object, sampler: object, sigmas: 
 
 # --------------------------------------------------------------------------- Ultimate KSampler
 
-class JWTFUltimateKSampler:
-    CATEGORY = CATEGORY_SAMPLING
-    RETURN_TYPES = ("LATENT", "LATENT", "IMAGE", "AUDIO")
-    RETURN_NAMES = ("latent", "denoised", "image", "audio")
-    FUNCTION = "sample"
-    OUTPUT_NODE = True
-    DESCRIPTION = "KSampler with live preview, chained step runs, RES4LYF dispatch and optional decode."
+class JWTFUltimateKSampler(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFUltimateKSampler",
+            display_name='Ultimate KSampler',
+            category='JezzWTF/sampling',
+            description='KSampler with live preview, chained step runs, RES4LYF dispatch and optional decode.',
+            inputs=[
+                io.Model.Input("model"),
+                io.Conditioning.Input("positive"),
+                io.Latent.Input("latent_image"),
+                io.Combo.Input("sampler_name", options=sampler_choices(), default='euler'),
+                io.Combo.Input("scheduler", options=scheduler_choices(), default='beta'),
+                io.Int.Input("steps", default=30, min=1, max=10000),
+                io.Int.Input("steps_to_run", default=-1, min=-1, max=10000),
+                io.Float.Input("cfg", default=5.5, min=-100.0, max=100.0, step=0.01, round=False),
+                io.Boolean.Input("cfg_enabled", default=True),
+                io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01),
+                io.Int.Input("seed", default=0, min=0, max=18446744073709551615),
+                io.Float.Input("eta", default=0.5, min=-100.0, max=100.0, step=0.01),
+                io.Combo.Input("sampler_mode", options=list(SAMPLER_MODES), default='standard'),
+                io.Boolean.Input("bongmath", default=True),
+                io.Boolean.Input("decode", default=True),
+                io.Boolean.Input("tiled_decode", default=False),
+                io.Int.Input("preview_fps", default=12, min=1, max=60),
+                io.Conditioning.Input("negative", optional=True),
+                io.Vae.Input("vae", optional=True),
+                io.Vae.Input("audio_vae", optional=True),
+                io.Sigmas.Input("sigmas", optional=True),
+                io.Custom("OPTIONS").Input("options", optional=True),
+                io.Boolean.Input("preview", default=True, optional=True),
+                io.Int.Input("preview_max_res", default=1024, min=0, max=8192, step=8, optional=True),
+                io.Int.Input("preview_frames", default=1, min=1, max=1024, optional=True),
+                io.Int.Input("preview_jpeg_quality", default=80, min=30, max=100, optional=True),
+                io.Combo.Input("preview_tiny_vae", options=['none'], default='none', optional=True),
+            ],
+            outputs=[
+                io.Latent.Output("latent"),
+                io.Latent.Output("denoised"),
+                io.Image.Output("image"),
+                io.Audio.Output("audio"),
+            ],
+            hidden=[io.Hidden.unique_id, io.Hidden.dynprompt],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        samplers = sampler_choices()
-        schedulers = scheduler_choices()
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "positive": ("CONDITIONING",),
-                "latent_image": ("LATENT",),
-                "sampler_name": (samplers, {"default": "euler" if "euler" in samplers else samplers[0]}),
-                "scheduler": (schedulers, {"default": default_scheduler(schedulers)}),
-                "steps": ("INT", {"default": 30, "min": 1, "max": 10000}),
-                "steps_to_run": ("INT", {"default": -1, "min": -1, "max": 10000}),
-                "cfg": ("FLOAT", {"default": 5.5, "min": -100.0, "max": 100.0, "step": 0.01, "round": False}),
-                "cfg_enabled": ("BOOLEAN", {"default": True}),
-                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": INT64}),
-                "eta": ("FLOAT", {"default": 0.5, "min": -100.0, "max": 100.0, "step": 0.01}),
-                "sampler_mode": (list(SAMPLER_MODES), {"default": "standard"}),
-                "bongmath": ("BOOLEAN", {"default": True}),
-                "decode": ("BOOLEAN", {"default": True}),
-                "tiled_decode": ("BOOLEAN", {"default": False}),
-                "preview_fps": ("INT", {"default": 12, "min": 1, "max": 60}),
-            },
-            "optional": {
-                "negative": ("CONDITIONING",),
-                "vae": ("VAE",),
-                "audio_vae": ("VAE",),
-                "sigmas": ("SIGMAS",),
-                "options": ("OPTIONS",),
-                **preview_optional(),
-            },
-            "hidden": _hidden(),
-        }
-
-    def sample(self, model: object, positive: object, latent_image: Latent, sampler_name: str, scheduler: str,
+    def execute(cls, model: object, positive: object, latent_image: Latent, sampler_name: str, scheduler: str,
                steps: int, steps_to_run: int, cfg: float, cfg_enabled: bool, denoise: float, seed: int,
                eta: float, sampler_mode: str, bongmath: bool, decode: bool, tiled_decode: bool,
                preview_fps: int, negative: object | None = None, vae: object | None = None,
                audio_vae: object | None = None, sigmas: torch.Tensor | None = None,
                options: object | None = None, preview: bool = True, preview_max_res: int = 1024,
-               preview_frames: int = 1, preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none",
-               unique_id: object = "", dynprompt: object = None) -> dict[str, object]:
+               preview_frames: int = 1, preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none") -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
+        dynprompt = cls.hidden.dynprompt
         emit_phase(unique_id, dynprompt, "sampling")
         use_cfg = bool(cfg_enabled)
         if negative is None:
@@ -320,7 +313,7 @@ class JWTFUltimateKSampler:
                                preview_fps, preview_tiny_vae, vae, audio_vae, unique_id, dynprompt)
         if scheduler == "none" and sigmas is None:
             raise RefModError("scheduler is 'none' but no sigmas are connected")
-        latent, denoised = self._dispatch(model, positive, negative, latent_image, sampler_name, scheduler,
+        latent, denoised = cls._dispatch(model, positive, negative, latent_image, sampler_name, scheduler,
                                           int(steps), int(steps_to_run), float(cfg), use_cfg, float(denoise),
                                           int(seed), float(eta), sampler_mode, bool(bongmath), sigmas, options)
         return finish(latent, denoised, bool(decode), vae, audio_vae, bool(tiled_decode), unique_id, dynprompt)
@@ -375,53 +368,59 @@ def guider_model(guider: object | None) -> object | None:
     return None
 
 
-class JWTFH3KSampler:
-    CATEGORY = CATEGORY_SAMPLING
-    RETURN_TYPES = ("LATENT", "LATENT", "IMAGE", "AUDIO")
-    RETURN_NAMES = ("latent", "denoised", "image", "audio")
-    FUNCTION = "sample"
-    OUTPUT_NODE = True
-    DESCRIPTION = "CFG-free SamplerCustomAdvanced-shaped sampler for MiniMax H3 with live preview."
+class JWTFH3KSampler(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFH3KSampler",
+            display_name='H3 KSampler',
+            category='JezzWTF/sampling',
+            description='CFG-free SamplerCustomAdvanced-shaped sampler for MiniMax H3 with live preview.',
+            inputs=[
+                io.Latent.Input("latent_image"),
+                io.Combo.Input("sampler_name", options=base_samplers(), default='euler'),
+                io.Combo.Input("scheduler", options=scheduler_choices(include_res4lyf=False), default='beta'),
+                io.Int.Input("steps", default=8, min=1, max=10000),
+                io.Int.Input("steps_to_run", default=-1, min=-1, max=10000),
+                io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01),
+                io.Int.Input("seed", default=0, min=0, max=18446744073709551615),
+                io.Boolean.Input("decode", default=True),
+                io.Boolean.Input("tiled_decode", default=False),
+                io.Int.Input("preview_fps", default=12, min=1, max=60),
+                io.Noise.Input("noise", optional=True),
+                io.Guider.Input("guider", optional=True),
+                io.Sampler.Input("sampler", optional=True),
+                io.Sigmas.Input("sigmas", optional=True),
+                io.Model.Input("model", optional=True),
+                io.Conditioning.Input("positive", optional=True),
+                io.Vae.Input("vae", optional=True),
+                io.Vae.Input("audio_vae", optional=True),
+                io.Boolean.Input("preview", default=True, optional=True),
+                io.Int.Input("preview_max_res", default=1024, min=0, max=8192, step=8, optional=True),
+                io.Int.Input("preview_frames", default=1, min=1, max=1024, optional=True),
+                io.Int.Input("preview_jpeg_quality", default=80, min=30, max=100, optional=True),
+                io.Combo.Input("preview_tiny_vae", options=['none'], default='none', optional=True),
+            ],
+            outputs=[
+                io.Latent.Output("latent"),
+                io.Latent.Output("denoised"),
+                io.Image.Output("image"),
+                io.Audio.Output("audio"),
+            ],
+            hidden=[io.Hidden.unique_id, io.Hidden.dynprompt],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        samplers = base_samplers()
-        schedulers = scheduler_choices(include_res4lyf=False)
-        return {
-            "required": {
-                "latent_image": ("LATENT",),
-                "sampler_name": (samplers, {"default": "euler" if "euler" in samplers else samplers[0]}),
-                "scheduler": (schedulers, {"default": default_scheduler(schedulers)}),
-                "steps": ("INT", {"default": 8, "min": 1, "max": 10000}),
-                "steps_to_run": ("INT", {"default": -1, "min": -1, "max": 10000}),
-                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": INT64}),
-                "decode": ("BOOLEAN", {"default": True}),
-                "tiled_decode": ("BOOLEAN", {"default": False}),
-                "preview_fps": ("INT", {"default": 12, "min": 1, "max": 60}),
-            },
-            "optional": {
-                "noise": ("NOISE",),
-                "guider": ("GUIDER",),
-                "sampler": ("SAMPLER",),
-                "sigmas": ("SIGMAS",),
-                "model": ("MODEL",),
-                "positive": ("CONDITIONING",),
-                "vae": ("VAE",),
-                "audio_vae": ("VAE",),
-                **preview_optional(),
-            },
-            "hidden": _hidden(),
-        }
-
-    def sample(self, latent_image: Latent, sampler_name: str, scheduler: str, steps: int, steps_to_run: int,
+    def execute(cls, latent_image: Latent, sampler_name: str, scheduler: str, steps: int, steps_to_run: int,
                denoise: float, seed: int, decode: bool, tiled_decode: bool, preview_fps: int,
                noise: object | None = None, guider: object | None = None, sampler: object | None = None,
                sigmas: torch.Tensor | None = None, model: object | None = None,
                positive: object | None = None, vae: object | None = None, audio_vae: object | None = None,
                preview: bool = True, preview_max_res: int = 1024, preview_frames: int = 1,
-               preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none",
-               unique_id: object = "", dynprompt: object = None) -> dict[str, object]:
+               preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none") -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
+        dynprompt = cls.hidden.dynprompt
         emit_phase(unique_id, dynprompt, "sampling")
         # The preview must wrap the model the guider actually samples (it carries its LoRA/refmod patches);
         # the ``model`` input is only a fallback and the source of the sigma schedule.
@@ -469,11 +468,4 @@ class JWTFH3KSampler:
         return finish(latent, denoised, bool(decode), vae, audio_vae, bool(tiled_decode), unique_id, dynprompt)
 
 
-NODE_CLASS_MAPPINGS = {
-    "JWTFUltimateKSampler": JWTFUltimateKSampler,
-    "JWTFH3KSampler": JWTFH3KSampler,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "JWTFUltimateKSampler": "Ultimate KSampler",
-    "JWTFH3KSampler": "H3 KSampler",
-}
+NODES = [JWTFUltimateKSampler, JWTFH3KSampler]

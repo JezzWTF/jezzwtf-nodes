@@ -8,17 +8,10 @@ from typing import Callable, TypedDict
 
 from PIL import Image
 
+from comfy_api.latest import io
+
 from .card_v2 import CardError, card_info, parse_card_text
-from .common import (
-    CATEGORY_CARDS,
-    JSONDict,
-    JSONTextError,
-    JSONValue,
-    frame_to_uint8,
-    parse_json_text,
-    safe_name,
-    safe_prefix_path,
-)
+from .common import JSONDict, JSONTextError, JSONValue, frame_to_uint8, parse_json_text, safe_name, safe_prefix_path
 from .png_chunks import decode_chara, encode_chara, read_png_text_from_file, save_png_with_text
 
 
@@ -93,30 +86,30 @@ def verify_chara(path: str, card: JSONDict) -> None:
         raise RuntimeError(f"Verification failed: the `chara` chunk in {path} does not match the card")
 
 
-class JWTFV2PNGBaker:
-    CATEGORY = CATEGORY_CARDS
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("saved_path", "character_name")
-    FUNCTION = "bake"
-    OUTPUT_NODE = True
+class JWTFV2PNGBaker(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFV2PNGBaker",
+            display_name='Character Card PNG Baker',
+            category='JezzWTF/Cards',
+            inputs=[
+                io.Image.Input("image"),
+                io.String.Input("json_text", multiline=True, force_input=True),
+                io.String.Input("filename_prefix", default='V2_cards/%name%'),
+                io.Boolean.Input("fill_missing_fields", default=True, label_on='fill missing V2 fields', label_off='keep JSON exactly as pasted'),
+                io.Combo.Input("save_to", options=[SAVE_TO_CHARACTERS, SAVE_TO_OUTPUT], default='characters folder', optional=True),
+            ],
+            outputs=[
+                io.String.Output("saved_path"),
+                io.String.Output("character_name"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "json_text": ("STRING", {"forceInput": True, "multiline": True}),
-                "filename_prefix": ("STRING", {"default": "V2_cards/%name%"}),
-                "fill_missing_fields": ("BOOLEAN", {"default": True, "label_on": "fill missing V2 fields",
-                                                    "label_off": "keep JSON exactly as pasted"}),
-            },
-            "optional": {
-                "save_to": ([SAVE_TO_CHARACTERS, SAVE_TO_OUTPUT], {"default": SAVE_TO_CHARACTERS}),
-            },
-        }
-
-    def bake(self, image: object, json_text: str, filename_prefix: str, fill_missing_fields: bool,
-             save_to: str = SAVE_TO_CHARACTERS) -> dict[str, object]:
+    def execute(cls, image: object, json_text: str, filename_prefix: str, fill_missing_fields: bool,
+             save_to: str = SAVE_TO_CHARACTERS) -> io.NodeOutput:
         try:
             card, notes = parse_card_text(json_text, bool(fill_missing_fields))
         except (CardError, JSONTextError) as exc:
@@ -128,7 +121,7 @@ class JWTFV2PNGBaker:
         paths, saved = save_batch(image, card_prefix(filename_prefix, name), {"chara": b64},
                                   lambda p: verify_chara(p, card), to_characters=save_to != SAVE_TO_OUTPUT)
         info = card_info(card, len(b64), notes)
-        return {"ui": {"card_preview": saved, "card_info": [info]}, "result": ("\n".join(paths), name)}
+        return io.NodeOutput("\n".join(paths), name, ui={"card_preview": saved, "card_info": [info]})
 
 
 # --------------------------------------------------------------------------- workflow baker
@@ -193,25 +186,30 @@ def verify_workflow(path: str, workflow: JSONDict | None, prompt: JSONDict | Non
             raise RuntimeError(f"Verification failed: the `{key}` chunk in {path} does not match")
 
 
-class JWTFWorkflowPNGBaker:
-    CATEGORY = CATEGORY_CARDS
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("saved_path",)
-    FUNCTION = "bake"
-    OUTPUT_NODE = True
+class JWTFWorkflowPNGBaker(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFWorkflowPNGBaker",
+            display_name='Workflow PNG Baker',
+            category='JezzWTF/Cards',
+            inputs=[
+                io.Image.Input("image"),
+                io.String.Input("json_text", multiline=True, force_input=True),
+                io.String.Input("filename_prefix", default='Workflow_PNG/workflow'),
+            ],
+            outputs=[
+                io.String.Output("saved_path"),
+            ],
+            is_output_node=True,
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> dict[str, dict[str, tuple]]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "json_text": ("STRING", {"forceInput": True, "multiline": True}),
-                "filename_prefix": ("STRING", {"default": "Workflow_PNG/workflow"}),
-            }
-        }
-
-    def bake(self, image: object, json_text: str, filename_prefix: str) -> dict[str, object]:
+    def execute(cls, image: object, json_text: str, filename_prefix: str) -> io.NodeOutput:
         workflow, prompt = classify_workflow(json_text)
         paths, saved = save_batch(image, safe_prefix_path(filename_prefix), workflow_chunks(workflow, prompt),
                                   lambda p: verify_workflow(p, workflow, prompt))
-        return {"ui": {"images": saved}, "result": ("\n".join(paths),)}
+        return io.NodeOutput("\n".join(paths), ui={"images": saved})
+
+
+NODES = [JWTFV2PNGBaker, JWTFWorkflowPNGBaker]

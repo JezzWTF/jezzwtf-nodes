@@ -12,8 +12,10 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from comfy_api.latest import io
+
 from . import _comfy
-from ._types import CATEGORY_LOADERS, InputTypes, RefModError
+from ._types import RefModError
 
 log = logging.getLogger("jezzwtf.refmod_h3")
 
@@ -321,62 +323,65 @@ def switch(text: str, default: bool = False) -> tuple[str, dict[str, object]]:
 
 # --------------------------------------------------------------------------- node
 
-class JWTFUltimateModelLoader:
-    CATEGORY = CATEGORY_LOADERS
-    RETURN_TYPES = ("MODEL", "CLIP", "CLIP", "VAE", "VAE")
-    RETURN_NAMES = ("MODEL", "CLIP (main)", "CLIP (enhancer)", "VAE (video/default)", "VAE (audio)")
-    FUNCTION = "load"
-    DESCRIPTION = "Diffusion model, attention backend, block-sparse attention, two text encoders and two VAEs."
+class JWTFUltimateModelLoader(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFUltimateModelLoader",
+            display_name='Ultimate Model Loader',
+            category='JezzWTF/loaders',
+            description='Diffusion model, attention backend, block-sparse attention, two text encoders and two VAEs.',
+            inputs=[
+                io.Combo.Input("model_name", options=_comfy.filename_list("diffusion_models") or _comfy.filename_list("unet")),
+                io.Combo.Input("quant_format", options=quant_choices(), default='auto'),
+                io.Combo.Input("model_type", options=list(MODEL_TYPES), default='default'),
+                io.Boolean.Input("kitchen", default=True, label_on='kitchen', label_off='kitchen'),
+                io.Boolean.Input("sage2", default=False, label_on='sage2', label_off='sage2'),
+                io.Boolean.Input("sage3", default=False, label_on='sage3', label_off='sage3'),
+                io.Boolean.Input("triton", default=False, label_on='triton', label_off='triton'),
+                io.Boolean.Input("flash2", default=False, label_on='flash2', label_off='flash2'),
+                io.Boolean.Input("pytorch", default=False, label_on='pytorch', label_off='pytorch'),
+                io.Boolean.Input("sparse", default=False, label_on='sparse', label_off='sparse'),
+                io.Boolean.Input("vsa", default=False, label_on='vsa', label_off='vsa'),
+                io.Combo.Input("clip1_name", options=_comfy.filename_list("text_encoders") or _comfy.filename_list("clip")),
+                io.Combo.Input("clip1_type", options=clip_type_names(), default='auto'),
+                io.Combo.Input("clip1_device", options=list(CLIP_DEVICES), default='default'),
+                io.Boolean.Input("clip2_enabled", default=False, label_on='clip2_enabled', label_off='clip2_enabled'),
+                io.Combo.Input("clip2_name", options=_comfy.filename_list("text_encoders") or _comfy.filename_list("clip")),
+                io.Combo.Input("clip2_type", options=clip_type_names(), default='auto'),
+                io.Combo.Input("clip2_device", options=list(CLIP_DEVICES), default='default'),
+                io.Combo.Input("vae_name", options=_comfy.filename_list("vae")),
+                io.Boolean.Input("audio_vae_enabled", default=False, label_on='audio_vae_enabled', label_off='audio_vae_enabled'),
+                io.Combo.Input("audio_vae_name", options=_comfy.filename_list("vae")),
+                io.String.Input("heading_model", default='Model'),
+                io.String.Input("heading_engine", default='Efficiencies'),
+                io.String.Input("heading_clips", default='Text Encoders'),
+                io.String.Input("heading_vaes", default='VAEs'),
+                io.String.Input("section_order", default='model,engine,clips,vaes'),
+            ],
+            outputs=[
+                io.Model.Output("MODEL"),
+                io.Clip.Output("CLIP (main)"),
+                io.Clip.Output("CLIP (enhancer)"),
+                io.Vae.Output("VAE (video/default)"),
+                io.Vae.Output("VAE (audio)"),
+            ],
+            hidden=[io.Hidden.unique_id],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> InputTypes:
-        models = _comfy.filename_list("diffusion_models") or _comfy.filename_list("unet")
-        clips = _comfy.filename_list("text_encoders") or _comfy.filename_list("clip")
-        vaes = _comfy.filename_list("vae")
-        clip_types = clip_type_names()
-        return {
-            "required": {
-                "model_name": (models,),
-                "quant_format": (quant_choices(), {"default": "auto"}),
-                "model_type": (list(MODEL_TYPES), {"default": "default"}),
-                "kitchen": switch("kitchen", True),
-                "sage2": switch("sage2"),
-                "sage3": switch("sage3"),
-                "triton": switch("triton"),
-                "flash2": switch("flash2"),
-                "pytorch": switch("pytorch"),
-                "sparse": switch("sparse"),
-                "vsa": switch("vsa"),
-                "clip1_name": (clips,),
-                "clip1_type": (clip_types, {"default": "auto"}),
-                "clip1_device": (list(CLIP_DEVICES), {"default": "default"}),
-                "clip2_enabled": switch("clip2_enabled"),
-                "clip2_name": (clips,),
-                "clip2_type": (clip_types, {"default": "auto"}),
-                "clip2_device": (list(CLIP_DEVICES), {"default": "default"}),
-                "vae_name": (vaes,),
-                "audio_vae_enabled": switch("audio_vae_enabled"),
-                "audio_vae_name": (vaes,),
-                "heading_model": ("STRING", {"default": DEFAULT_HEADINGS["heading_model"]}),
-                "heading_engine": ("STRING", {"default": DEFAULT_HEADINGS["heading_engine"]}),
-                "heading_clips": ("STRING", {"default": DEFAULT_HEADINGS["heading_clips"]}),
-                "heading_vaes": ("STRING", {"default": DEFAULT_HEADINGS["heading_vaes"]}),
-                "section_order": ("STRING", {"default": DEFAULT_SECTION_ORDER}),
-            },
-            "hidden": {"unique_id": "UNIQUE_ID"},
-        }
-
-    @classmethod
-    def VALIDATE_INPUTS(cls, **_: object) -> bool:
+    def validate_inputs(cls, **_: object) -> bool:
         return True
 
-    def load(self, model_name: str, quant_format: str, model_type: str, kitchen: bool, sage2: bool, sage3: bool,
+    @classmethod
+    def execute(cls, model_name: str, quant_format: str, model_type: str, kitchen: bool, sage2: bool, sage3: bool,
              triton: bool, flash2: bool, pytorch: bool, sparse: bool, vsa: bool, clip1_name: str,
              clip1_type: str, clip1_device: str, clip2_enabled: bool, clip2_name: str, clip2_type: str,
              clip2_device: str, vae_name: str, audio_vae_enabled: bool, audio_vae_name: str,
              heading_model: str = "", heading_engine: str = "", heading_clips: str = "",
-             heading_vaes: str = "", section_order: str = DEFAULT_SECTION_ORDER, unique_id: object = ""
-             ) -> tuple[object, object, object | None, object, object | None]:
+             heading_vaes: str = "", section_order: str = DEFAULT_SECTION_ORDER
+             ) -> io.NodeOutput:
+        unique_id = cls.hidden.unique_id
         if sparse and vsa:
             raise RefModError("sparse and vsa cannot both be on; pick one")
         if triton:
@@ -411,8 +416,7 @@ class JWTFUltimateModelLoader:
             "backend": backend, "sparse": bool(sparse), "vsa": bool(vsa),
             "clip2": bool(clip2_enabled), "audio_vae": bool(audio_vae_enabled),
         })
-        return model, clip_main, clip_extra, vae, audio_vae
+        return io.NodeOutput(model, clip_main, clip_extra, vae, audio_vae)
 
 
-NODE_CLASS_MAPPINGS = {"JWTFUltimateModelLoader": JWTFUltimateModelLoader}
-NODE_DISPLAY_NAME_MAPPINGS = {"JWTFUltimateModelLoader": "Ultimate Model Loader"}
+NODES = [JWTFUltimateModelLoader]

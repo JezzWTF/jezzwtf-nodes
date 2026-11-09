@@ -12,6 +12,7 @@ from utility_core.get_image import compute_mask
 from utility_core.multi_load import JWTFMultiLoadImage, parse_names
 from utility_core.set_get import PLACEHOLDER, STORE, JWTFGet, JWTFSet, SetGetStore
 from utility_core.text_nodes import JWTFTextBox, build_edit_prompt, zero_out
+from v3_helpers import hidden, legacy
 
 
 # ------------------------------------------------------------ set / get
@@ -32,12 +33,13 @@ def test_store_roundtrip_and_overwrite() -> None:
 
 def test_set_get_nodes() -> None:
     marker = object()
-    assert JWTFSet().run("set_x", marker, "Neon", "7") == (marker,)
-    assert JWTFGet().run("set_x") == (marker,)
+    with hidden(JWTFSet, unique_id="7"):
+        assert legacy(JWTFSet.execute("set_x", marker, "Neon")) == (marker,)
+    assert legacy(JWTFGet.execute("set_x")) == (marker,)
     linked = object()
-    assert JWTFGet().run("set_x", set_link=linked) == (linked,)
-    assert JWTFGet().run("anything", set_link=None) == (None,)
-    assert JWTFGet.VALIDATE_INPUTS("not-a-listed-key") is True
+    assert legacy(JWTFGet.execute("set_x", set_link=linked)) == (linked,)
+    assert legacy(JWTFGet.execute("anything", set_link=None)) == (None,)
+    assert JWTFGet.validate_inputs("not-a-listed-key") is True
     assert STORE.entry("set_x") is not None
 
 
@@ -47,17 +49,19 @@ def test_get_is_changed_follows_set_version() -> None:
     s.set("k", 1)
     s.set("k", 2)
     assert s.version("k") == 2
-    JWTFSet().run("set_ver_probe", 1)
-    before = JWTFGet.IS_CHANGED("set_ver_probe", set_link=None)
-    JWTFSet().run("set_ver_probe", 2)
-    assert JWTFGet.IS_CHANGED("set_ver_probe") != before
+    with hidden(JWTFSet, unique_id="7"):
+        legacy(JWTFSet.execute("set_ver_probe", 1))
+    before = JWTFGet.fingerprint_inputs("set_ver_probe", set_link=None)
+    with hidden(JWTFSet, unique_id="7"):
+        legacy(JWTFSet.execute("set_ver_probe", 2))
+    assert JWTFGet.fingerprint_inputs("set_ver_probe") != before
 
 
 # ------------------------------------------------------------ text
 
 def test_text_box() -> None:
-    assert JWTFTextBox().run("a\nb") == ("a\nb",)
-    assert JWTFTextBox.IS_CHANGED("abc") == "abc"
+    assert legacy(JWTFTextBox.execute("a\nb")) == ("a\nb",)
+    assert JWTFTextBox.fingerprint_inputs("abc") == "abc"
 
 
 def test_edit_prompt() -> None:
@@ -105,12 +109,12 @@ def test_draw_image(tmp_path: Path) -> None:
     assert resolve_input_file("../etc/passwd", str(tmp_path)) is None
     assert resolve_input_file("jezzwtf_draw", str(tmp_path)) is None
     assert resolve_input_file("", str(tmp_path)) is None
-    node = JWTFDrawImage()
-    image, mask = node.run(64, 72, "transparent", "")
+    node = JWTFDrawImage
+    image, mask = legacy(node.execute(64, 72, "transparent", ""))
     assert image.shape == (1, 72, 64, 3) and torch.all(mask == 1)
-    image, mask = node.run(64, 64, "white", "")
+    image, mask = legacy(node.execute(64, 64, "white", ""))
     assert torch.all(image == 1) and torch.all(mask == 0)
-    assert JWTFDrawImage.IS_CHANGED(64, 64, "black", "") == "blank-64x64-black"
+    assert JWTFDrawImage.fingerprint_inputs(64, 64, "black", "") == "blank-64x64-black"
 
 
 def test_draw_image_premultiply(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -118,12 +122,12 @@ def test_draw_image_premultiply(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
     Image.new("RGBA", (4, 4), (255, 255, 255, 51)).save(tmp_path / "f.png")
     monkeypatch.setattr(di, "input_dir", lambda: str(tmp_path))
-    image, mask = JWTFDrawImage().run(64, 64, "transparent", "f.png")
+    image, mask = legacy(JWTFDrawImage.execute(64, 64, "transparent", "f.png"))
     assert image.shape == (1, 4, 4, 3)
     assert abs(float(image[0, 0, 0, 0]) - 0.2) < 1e-6 and abs(float(mask[0, 0, 0]) - 0.8) < 1e-6
-    image, _ = JWTFDrawImage().run(64, 64, "white", "f.png")
+    image, _ = legacy(JWTFDrawImage.execute(64, 64, "white", "f.png"))
     assert float(image[0, 0, 0, 0]) == 1.0
-    assert len(JWTFDrawImage.IS_CHANGED(64, 64, "white", "f.png")) == 64
+    assert len(JWTFDrawImage.fingerprint_inputs(64, 64, "white", "f.png")) == 64
 
 
 # ------------------------------------------------------------ multi load
@@ -136,5 +140,5 @@ def test_multi_load_parse() -> None:
 
 
 def test_multi_load_placeholders() -> None:
-    out = JWTFMultiLoadImage().run('[""]')
+    out = legacy(JWTFMultiLoadImage.execute('[""]'))
     assert len(out) == 16 and all(t.shape == (1, 64, 64, 3) for t in out)

@@ -9,6 +9,7 @@ import torch
 
 from refmod_h3 import _comfy, preview, samplers
 from refmod_h3._types import RefModError
+from v3_helpers import legacy, legacy_spec, run_node
 
 LATENT = {"samples": torch.zeros(1, 4, 8, 8)}
 
@@ -105,7 +106,7 @@ def test_node_ids_prefer_display_id() -> None:
 
 def test_ultimate_interface() -> None:
     cls = samplers.JWTFUltimateKSampler
-    spec = cls.INPUT_TYPES()
+    spec = legacy_spec(cls)
     assert list(spec["required"]) == ["model", "positive", "latent_image", "sampler_name", "scheduler", "steps",
                                       "steps_to_run", "cfg", "cfg_enabled", "denoise", "seed", "eta",
                                       "sampler_mode", "bongmath", "decode", "tiled_decode", "preview_fps"]
@@ -116,8 +117,8 @@ def test_ultimate_interface() -> None:
     assert {"negative", "vae", "audio_vae", "sigmas", "options", "preview", "preview_max_res", "preview_frames",
             "preview_jpeg_quality", "preview_tiny_vae"} <= set(spec["optional"])
     assert spec["hidden"] == {"unique_id": "UNIQUE_ID", "dynprompt": "DYNPROMPT"}
-    assert cls.RETURN_NAMES == ("latent", "denoised", "image", "audio") and cls.OUTPUT_NODE and cls.CATEGORY == "JezzWTF/sampling"
-    h3 = samplers.JWTFH3KSampler.INPUT_TYPES()
+    assert tuple(cls.RETURN_NAMES) == ("latent", "denoised", "image", "audio") and cls.OUTPUT_NODE and cls.CATEGORY == "JezzWTF/sampling"
+    h3 = legacy_spec(samplers.JWTFH3KSampler)
     assert h3["required"]["steps"][1]["default"] == 8 and h3["required"]["scheduler"][0][0] == "none"
     assert {"noise", "guider", "sampler", "sigmas", "model", "positive"} <= set(h3["optional"])
 
@@ -128,7 +129,7 @@ def run_ultimate(**over: object) -> dict[str, object]:
         steps_to_run=-1, cfg=5.0, cfg_enabled=True, denoise=1.0, seed=7, eta=0.5, sampler_mode="standard",
         bongmath=True, decode=False, tiled_decode=False, preview_fps=12, preview=False, unique_id="9")
     kw.update(over)
-    return samplers.JWTFUltimateKSampler().sample(**kw)  # type: ignore[arg-type]
+    return run_node(samplers.JWTFUltimateKSampler, **kw)  # type: ignore[arg-type]
 
 
 def test_ultimate_plain_path_uses_common_ksampler(monkeypatch: pytest.MonkeyPatch, rec: Recorder,
@@ -224,30 +225,30 @@ def test_decode_nested_latent_and_missing_vae(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_h3_sampler_error_matrix(rec: Recorder, events: list[tuple[str, dict[str, object]]]) -> None:
-    node = samplers.JWTFH3KSampler()
+    node = samplers.JWTFH3KSampler
     base = dict(latent_image=LATENT, sampler_name="euler", scheduler="beta", steps=4, steps_to_run=-1,
                 denoise=1.0, seed=1, decode=False, tiled_decode=False, preview_fps=12, preview=False)
     with pytest.raises(RefModError, match="connect a model or a guider"):
-        node.sample(**base)  # type: ignore[arg-type]
+        run_node(node, **base)  # type: ignore[arg-type]
     with pytest.raises(RefModError, match="needs sigmas"):
-        node.sample(guider=object(), **base)  # type: ignore[arg-type]
+        run_node(node, guider=object(), **base)  # type: ignore[arg-type]
     with pytest.raises(RefModError, match="positive"):
-        node.sample(model=object(), **base)  # type: ignore[arg-type]
+        run_node(node, model=object(), **base)  # type: ignore[arg-type]
     with pytest.raises(RefModError, match="no sigmas"):
-        node.sample(model=object(), positive=[["p"]], **{**base, "scheduler": "none"})  # type: ignore[arg-type]
+        run_node(node, model=object(), positive=[["p"]], **{**base, "scheduler": "none"})  # type: ignore[arg-type]
 
 
 def test_h3_sampler_defaults_and_wiring(rec: Recorder, events: list[tuple[str, dict[str, object]]]) -> None:
-    node = samplers.JWTFH3KSampler()
+    node = samplers.JWTFH3KSampler
     base = dict(latent_image=LATENT, sampler_name="euler", scheduler="beta", steps=4, steps_to_run=2,
                 denoise=1.0, seed=3, decode=False, tiled_decode=False, preview_fps=12, preview=False, unique_id="4")
-    out = node.sample(model=object(), positive=[["p"]], **base)  # type: ignore[arg-type]
+    out = run_node(node, model=object(), positive=[["p"]], **base)  # type: ignore[arg-type]
     assert rec.names == ["RandomNoise", "BasicGuider", "KSamplerSelect", "SamplerCustomAdvanced"]  # never CFG
     assert rec.kwargs("SamplerCustomAdvanced")["sigmas"].shape[-1] == 3
     assert out["result"][0] == {"samples": "out"} and out["result"][1] == {"samples": "denoised"}
     rec.calls.clear()
     guider = types.SimpleNamespace(model_patcher=types.SimpleNamespace(clone=lambda: None, add_wrapper_with_key=lambda *a: None))
-    node.sample(noise="N", guider=guider, sampler="S", sigmas=torch.linspace(1, 0, 5), model=None,
+    run_node(node, noise="N", guider=guider, sampler="S", sigmas=torch.linspace(1, 0, 5), model=None,
                 **{**base, "steps_to_run": -1})  # type: ignore[arg-type]
     assert rec.names == ["SamplerCustomAdvanced"]
     kw = rec.kwargs("SamplerCustomAdvanced")
@@ -270,7 +271,7 @@ def test_guider_model_lookup_and_shallow_copy_for_preview(monkeypatch: pytest.Mo
     assert samplers.guider_model(None) is None
     clone = Patcher()
     monkeypatch.setattr(samplers, "attach_preview", lambda *a, **k: clone)
-    samplers.JWTFH3KSampler().sample(
+    run_node(samplers.JWTFH3KSampler, 
         latent_image=LATENT, sampler_name="euler", scheduler="beta", steps=4, steps_to_run=-1, denoise=1.0, seed=1,
         decode=False, tiled_decode=False, preview_fps=12, guider=guider, sigmas=torch.linspace(1, 0, 5), preview=True)
     used = rec.kwargs("SamplerCustomAdvanced")["guider"]
@@ -308,7 +309,7 @@ def test_h3_preview_clones_the_guider_model_not_the_model_input(monkeypatch: pyt
     sigma_models: list[object] = []
     monkeypatch.setattr(samplers, "widget_sigmas",
                         lambda model, scheduler, steps, denoise: sigma_models.append(model) or torch.linspace(1, 0, steps + 1))
-    samplers.JWTFH3KSampler().sample(
+    run_node(samplers.JWTFH3KSampler, 
         latent_image=LATENT, sampler_name="euler", scheduler="beta", steps=4, steps_to_run=-1, denoise=1.0, seed=1,
         decode=False, tiled_decode=False, preview_fps=12, guider=guider, model=plain, preview=True)
     assert attached == [guided]  # the guider's patched model, not `model`

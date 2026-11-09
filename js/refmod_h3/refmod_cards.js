@@ -456,6 +456,11 @@ app.registerExtension({
             chain(proto, "onExecuted", function (message) {
                 const entry = message?.refmod_entry?.[0];
                 if (entry) this._jzBaked = entry;
+                const saved = message?.text?.[0];
+                if (typeof saved === "string" && saved) {
+                    // Say where the file went; the saved_path output carries the same string.
+                    app.extensionManager?.toast?.add({ severity: "success", summary: "RefMod saved", detail: saved, life: 8000 });
+                }
                 setTimeout(() => { refreshLibrary(true); app.refreshComboInNodes?.(); }, 250);
             });
         }

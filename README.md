@@ -32,7 +32,7 @@ Search for **JezzWTF QoL Nodes** and install it.
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/JezzWTF/comfyui-jezzwtf-nodes
+git clone https://github.com/JezzWTF/jezzwtf-nodes
 ```
 
 Restart ComfyUI, then hard-refresh the browser tab.

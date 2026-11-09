@@ -1,6 +1,6 @@
 [project]
 name = "jezzwtf-nodes"
-description = "JezzWTF quality-of-life nodes for ComfyUI: utilities, character chat and cards, LoRA and model loaders, MiniMax H3 RefMod, GIF tools, run timer and paste stack."
+description = "Quality-of-life nodes for ComfyUI: character chat and cards, LoRA and model loaders, MiniMax H3 RefMod, optimised GIFs, a run timer and a paste stack."
 version = "1.1.0"
 license = { file = "LICENSE" }
 readme = "README.md"
@@ -12,11 +12,11 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/JezzWTF/comfyui-jezzwtf-nodes"
-"Bug Tracker" = "https://github.com/JezzWTF/comfyui-jezzwtf-nodes/issues"
+Repository = "https://github.com/JezzWTF/jezzwtf-nodes"
+"Bug Tracker" = "https://github.com/JezzWTF/jezzwtf-nodes/issues"
 
 [tool.comfy]
 PublisherId = "jezzwtf"
 DisplayName = "JezzWTF QoL Nodes"
-Icon = "https://raw.githubusercontent.com/JezzWTF/comfyui-jezzwtf-nodes/main/assets/icon.svg"
+Icon = "https://raw.githubusercontent.com/JezzWTF/jezzwtf-nodes/main/assets/icon.svg"
 requires-comfyui = ">=0.44.0"

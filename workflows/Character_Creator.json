@@ -562,7 +562,7 @@
         }
       ],
       "properties": {
-        "aux_id": "JezzWTF/comfyui-jezzwtf-nodes",
+        "aux_id": "JezzWTF/jezzwtf-nodes",
         "ver": "79ed22136aa39fb5a0ddba6f6d10b9ac5a172f78",
         "Node name for S&R": "JWTFV2PNGBaker"
       },
@@ -886,7 +886,7 @@
         }
       ],
       "properties": {
-        "aux_id": "JezzWTF/comfyui-jezzwtf-nodes",
+        "aux_id": "JezzWTF/jezzwtf-nodes",
         "ver": "79ed22136aa39fb5a0ddba6f6d10b9ac5a172f78",
         "Node name for S&R": "JWTFCharacterChat"
       },

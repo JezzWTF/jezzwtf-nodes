@@ -163,7 +163,7 @@ Drag a file from [`example_workflows/`](example_workflows/) into ComfyUI.
 | `Character_Creator.json` | Qwen3.5 writes a Character Card V2 from a concept, bakes it with your portrait into a PNG (and optionally a character `.safetensors`), then chats with it | Qwen3.5 |
 | `Character_Chat.json` | The minimal setup: load Qwen3.5, pick a character card, chat, and Save chat | Qwen3.5 and a character card |
 | `Video_to_GIF_Optimised.json` | Load a video and optimise it into the best-looking GIF under a size budget | Nothing beyond core |
-| `GIF_Optimise_and_Compare.json` | Re-encode an existing GIF and compare it with the original: sizes, SSIM and a side-by-side | Nothing beyond core |
+| `GIF_Optimise_and_Compare.json` | Load a GIF, re-encode it, and compare the result with the original: sizes, SSIM and a side-by-side | Nothing beyond core |
 
 # License
 

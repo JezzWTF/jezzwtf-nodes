@@ -155,7 +155,7 @@ Uses ffmpeg (the `imageio-ffmpeg` build, a system ffmpeg, or the `JWTF_FFMPEG` e
 
 # Example workflows
 
-Drag a file from [`workflows/`](workflows/) into ComfyUI.
+Drag a file from [`example_workflows/`](example_workflows/) into ComfyUI.
 
 | Workflow | What it does |
 |---|---|

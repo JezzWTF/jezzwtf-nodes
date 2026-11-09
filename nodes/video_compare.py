@@ -17,6 +17,22 @@ except ImportError:  # ComfyUI without the native VIDEO type / comfy_api package
     _HAS_COMFY_API = False
 
 
+def even_dimensions(image):
+    """Pad an IMAGE batch [B, H, W, C] by one edge row/column where needed so H and W are even.
+
+    The preview is encoded as H.264 in yuv420p, which libx264 refuses to open for an odd width
+    or height (a 508x337 GIF, for example). Replicating the edge keeps every original pixel.
+    """
+    import torch
+
+    height, width = int(image.shape[1]), int(image.shape[2])
+    if height % 2:
+        image = torch.cat([image, image[:, -1:, :, :]], dim=1)
+    if width % 2:
+        image = torch.cat([image, image[:, :, -1:, :]], dim=2)
+    return image
+
+
 class VideoCompare:
     TITLE = "Video Compare"
     CATEGORY = "JezzWTF/video"
@@ -82,7 +98,8 @@ class VideoCompare:
                 f"or IMAGE frames on image_{tag.lower()} — neither is connected."
             )
         return InputImpl.VideoFromComponents(
-            Types.VideoComponents(images=image, audio=audio, frame_rate=Fraction(frame_rate).limit_denominator(1001))
+            Types.VideoComponents(images=even_dimensions(image), audio=audio,
+                                  frame_rate=Fraction(frame_rate).limit_denominator(1001))
         )
 
     def compare(self, video_a=None, video_b=None, image_a=None, image_b=None, audio_a=None, audio_b=None,

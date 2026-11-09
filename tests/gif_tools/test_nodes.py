@@ -60,18 +60,18 @@ def test_loop_count_mapping() -> None:
 
 
 @needs_ffmpeg
-def test_video_to_gif_from_images_saves_into_output_gifs(dirs: dict[str, str]) -> None:
+def test_video_to_gif_from_images_saves_where_the_prefix_says(dirs: dict[str, str]) -> None:
     clip = synth.motion_clip(12)
     out = JWTFVideoToGif().run("balanced", "my clip/ünï", images=as_tensor(clip), source_fps=20.0, fps=10.0, max_width=96, compare_naive=True)
     path, preview, report = out["result"]
     assert path.startswith(os.path.realpath(dirs["output"])) or path.startswith(dirs["output"])
-    assert os.path.basename(path) == "ünï_00001.gif" and os.path.dirname(path).endswith(os.path.join("gifs", "my clip"))
+    assert os.path.basename(path) == "ünï_00001.gif" and os.path.dirname(path).endswith("my clip") and "gifs" not in path
     assert os.path.getsize(path) > 0
     g = gifio.read_gif(path)
     assert len(g.frames) == preview.shape[0] and preview.shape[2] == 96
     assert "SSIM" in report and "naive" in report
     entry = out["ui"]["jwtf_gif"][0]
-    assert entry["subfolder"] == "gifs/my clip" and entry["filename"] == "ünï_00001.gif" and entry["stats"]["bytes"] == os.path.getsize(path)
+    assert entry["subfolder"] == "my clip" and entry["filename"] == "ünï_00001.gif" and entry["stats"]["bytes"] == os.path.getsize(path)
     again = JWTFVideoToGif().run("balanced", "my clip/ünï", images=as_tensor(clip), fps=10.0, max_width=96, compare_naive=False)
     assert os.path.basename(again["result"][0]) == "ünï_00002.gif"
 

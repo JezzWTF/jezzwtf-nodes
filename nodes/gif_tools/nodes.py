@@ -231,6 +231,7 @@ def _finish_gif(result: OptimiseResult, path: str, subfolder: str, filename: str
     frames, _ = decode_result(result.encode)
     tensor, sampled = preview_tensor(frames)
     report = result.report()
+    report += f"\nsaved: output/{subfolder + '/' if subfolder else ''}{filename}"
     if sampled:
         report += f"\nnote: preview output holds {MAX_PREVIEW_FRAMES} evenly spaced frames of {len(frames)}"
     return path, tensor, report, {"ui": _ui(subfolder, filename, result.stats(), mode), "result": (path, tensor, report)}
@@ -254,7 +255,7 @@ class JWTFVideoToGif:
             "fps": ("FLOAT", {"default": 20.0, "min": 0.0, "max": 1000.0, "step": 0.5, "tooltip": "Output frame rate; 0 = keep the source rate (capped at 50). 25, 20 and 12.5 give an even GIF cadence."}),
             **_optimise_widgets(),
         }
-        return {"required": {"mode": (list(MODES), {"default": "balanced"}), "filename_prefix": ("STRING", {"default": "clip"})}, "optional": optional}
+        return {"required": {"mode": (list(MODES), {"default": "balanced"}), "filename_prefix": ("STRING", {"default": "gifs/clip", "tooltip": "Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/clip saves to output/gifs/clip_00001.gif."})}, "optional": optional}
 
     def run(self, mode: str, filename_prefix: str, images: torch.Tensor | None = None, video: object | None = None, source_fps: float = 24.0,
             **kwargs: object) -> UIResult:
@@ -289,7 +290,7 @@ class JWTFGifOptimise:
         }
         return {"required": {"gif": ([USE_PATH, *list_input_gifs()], {"image_upload": True}),
                              "mode": (list(MODES), {"default": "balanced"}),
-                             "filename_prefix": ("STRING", {"default": "optimised"})}, "optional": optional}
+                             "filename_prefix": ("STRING", {"default": "gifs/optimised", "tooltip": "Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/optimised saves to output/gifs/optimised_00001.gif."})}, "optional": optional}
 
     @classmethod
     def IS_CHANGED(cls, gif: str = "", path: str = "", **_: object) -> str:
@@ -452,7 +453,7 @@ class JWTFFramesToAnimated:
                 "images": ("IMAGE", {}),
                 "fps": ("FLOAT", {"default": 20.0, "min": 0.1, "max": 240.0, "step": 0.5}),
                 "format": (list(FORMATS), {"default": "webp"}),
-                "filename_prefix": ("STRING", {"default": "anim"}),
+                "filename_prefix": ("STRING", {"default": "gifs/anim", "tooltip": "Relative to the output folder. Put a subfolder in the prefix, e.g. gifs/anim saves to output/gifs/anim_00001.webp."}),
             },
             "optional": {
                 "lossless": ("BOOLEAN", {"default": False}),

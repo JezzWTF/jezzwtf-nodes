@@ -91,10 +91,12 @@ def test_reserve_output_counts_up_and_stays_inside(tmp_path: pytest.TempPathFact
     p1, sub, name = output.reserve_output_path(root, "my clip ünï", "gif")
     p2, _, name2 = output.reserve_output_path(root, "my clip ünï", "gif")
     assert name == "my clip ünï_00001.gif" and name2 == "my clip ünï_00002.gif"
-    assert sub == "gifs" and os.path.isfile(p1) and os.path.isfile(p2)
+    assert sub == "" and os.path.isfile(p1) and os.path.isfile(p2)  # no forced folder: the prefix decides
     assert output.is_inside(root, p1)
     p3, sub3, _ = output.reserve_output_path(root, "deep/er/clip", "gif")
-    assert sub3 == "gifs/deep/er" and output.is_inside(root, p3)
+    assert sub3 == "deep/er" and output.is_inside(root, p3)
+    p4, sub4, _ = output.reserve_output_path(root, "gifs/optimised", "gif")
+    assert sub4 == "gifs" and os.path.dirname(p4) == os.path.join(root, "gifs")
     with pytest.raises(ValueError):
         output.reserve_output_path(root, "../../outside", "gif")
     with pytest.raises(ValueError):
@@ -110,7 +112,7 @@ def test_symlinked_subfolder_cannot_escape(tmp_path: pytest.TempPathFactory) -> 
     except (OSError, NotImplementedError):
         pytest.skip("symlinks not permitted here")
     with pytest.raises(ValueError):
-        output.reserve_output_path(str(root), "link/file", "gif")
+        output.reserve_output_path(str(root), "gifs/link/file", "gif")
     assert not any(outside.iterdir())
 
 

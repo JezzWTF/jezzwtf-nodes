@@ -5,7 +5,7 @@ import os
 import re
 from collections.abc import Sequence
 
-OUTPUT_SUBFOLDER = "gifs"
+OUTPUT_SUBFOLDER = ""  # none: the filename_prefix alone decides the folder, like core Save nodes
 _BAD_CHARS = re.compile(r'[<>:"|?*\x00-\x1f]')
 _WIN_RESERVED = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])$", re.IGNORECASE)
 MAX_COUNTER = 99999

@@ -73,6 +73,12 @@ function buildPreview(node) {
     getMinHeight: () => PREVIEW_H,
   });
   widget.serialize = false;
+  // The result is the point of these nodes, so show it first instead of below ~25 tuning widgets.
+  const at = node.widgets.indexOf(widget);
+  if (at > 0) {
+    node.widgets.splice(at, 1);
+    node.widgets.unshift(widget);
+  }
 
   const api_ = {
     refreshHint() {

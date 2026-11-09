@@ -42,7 +42,10 @@ def test_resolve_preset_wins_over_widgets() -> None:
 
 def test_node_output_and_ui() -> None:
     out = JWTFDurationFrames().run(6.0, "24 FPS", "ignored", 99)
-    assert out["result"] == (144, 6.0, 24)
+    assert out["result"] == (144, 6.0, 24.0, 24)
+    assert JWTFDurationFrames.RETURN_TYPES == ("INT", "FLOAT", "FLOAT", "INT")
+    assert JWTFDurationFrames.RETURN_NAMES == ("frames", "seconds", "fps", "fps_int")
+    assert isinstance(out["result"][2], float) and isinstance(out["result"][3], int)
     info = out["ui"]["jezzwtf_duration_frames"][0]
     assert info["frames"] == 144 and info["fps"] == 24 and info["expression"] == FPS_EXPR
 
@@ -140,3 +143,16 @@ def test_to_frames_limits() -> None:
     assert to_frames("-5", 0, 0) == 1
     assert to_frames("2.5", 0, 0) == 2
     assert to_frames("a > 1", 2, 0) == 1
+
+
+def test_fps_output_connects_to_a_float_frame_rate_input() -> None:
+    """ComfyUI refuses INT -> FLOAT links, so the `fps` output must be the FLOAT Video Compare expects."""
+    import os
+    import re
+
+    source = os.path.join(os.path.dirname(__file__), "..", "..", "nodes", "video_compare.py")
+    text = open(source, encoding="utf-8").read()
+    match = re.search(r'"frame_rate":\s*\("(\w+)"', text)
+    assert match is not None
+    fps_type = JWTFDurationFrames.RETURN_TYPES[JWTFDurationFrames.RETURN_NAMES.index("fps")]
+    assert fps_type == match.group(1)

@@ -66,8 +66,10 @@ def eval_rows(preset: str, expression: str, fps: int, values: list[object]) -> t
 
 class JWTFDurationFrames:
     CATEGORY = CATEGORY_UTILS
-    RETURN_TYPES = ("INT", "FLOAT", "INT")
-    RETURN_NAMES = ("frames", "seconds", "fps")
+    # ComfyUI will not connect an INT output to a FLOAT input, and most frame-rate inputs
+    # (Video Compare, Create Video, ...) are FLOAT, so `fps` is a FLOAT and `fps_int` covers INT inputs.
+    RETURN_TYPES = ("INT", "FLOAT", "FLOAT", "INT")
+    RETURN_NAMES = ("frames", "seconds", "fps", "fps_int")
     FUNCTION = "run"
 
     @classmethod
@@ -89,7 +91,7 @@ class JWTFDurationFrames:
             raise ValueError(f"Duration -> Frames: {exc} (expression: {expr})") from None
         seconds = frames / fps_used
         info = {"duration": duration, "frames": frames, "seconds": seconds, "fps": fps_used, "expression": expr}
-        return {"ui": {UI_KEY: [info]}, "result": (frames, seconds, fps_used)}
+        return {"ui": {UI_KEY: [info]}, "result": (frames, seconds, float(fps_used), fps_used)}
 
 
 def register_routes(routes: "web.RouteTableDef") -> None:

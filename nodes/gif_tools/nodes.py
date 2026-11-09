@@ -106,6 +106,11 @@ def gif_source(path: str) -> tuple[FrameSource, list[str], int]:
     return source_from_timed_arrays(g.frames, g.durations), g.notes, g.loop
 
 
+# Leading picker entry for GIF Optimise: ComfyUI validates the picker value even when it is greyed out,
+# so a workflow that feeds a path needs a value that is valid on every machine.
+USE_PATH = "(use path input)"
+
+
 def list_input_gifs() -> list[str]:
     try:
         names = sorted(n for n in os.listdir(input_dir()) if n.lower().endswith(".gif") and os.path.isfile(os.path.join(input_dir(), n)))
@@ -282,7 +287,8 @@ class JWTFGifOptimise:
             "fps": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.5, "tooltip": "0 = keep the GIF's own frame timing."}),
             **_optimise_widgets(),
         }
-        return {"required": {"gif": (list_input_gifs(), {"image_upload": True}), "mode": (list(MODES), {"default": "balanced"}),
+        return {"required": {"gif": ([USE_PATH, *list_input_gifs()], {"image_upload": True}),
+                             "mode": (list(MODES), {"default": "balanced"}),
                              "filename_prefix": ("STRING", {"default": "optimised"})}, "optional": optional}
 
     @classmethod
@@ -295,7 +301,10 @@ class JWTFGifOptimise:
             return "missing"
 
     def run(self, gif: str, mode: str, filename_prefix: str, path: str = "", **kwargs: object) -> UIResult:
-        real = resolve_existing_file(path.strip() or gif, read_roots())
+        chosen = path.strip() or ("" if gif == USE_PATH else gif)
+        if not chosen:
+            raise ValueError("GIF Optimise: pick a GIF, or connect a path (for example from Load GIF).")
+        real = resolve_existing_file(chosen, read_roots())
         source, notes, _ = gif_source(real)
         values: dict[str, object] = {"mode": mode, **kwargs}
         result, out_path, subfolder, filename, _ = _run_optimise(source, _defaults(values), notes, filename_prefix)
@@ -397,8 +406,9 @@ def _compose(a: Frame, b: Frame, layout: str) -> Frame:
 class JWTFLoadGif:
     CATEGORY = CATEGORY
     FUNCTION = "run"
-    RETURN_TYPES = ("IMAGE", "MASK", "FLOAT", "INT", "STRING")
-    RETURN_NAMES = ("images", "mask", "fps", "frame_count", "delays_ms")
+    # gif_path lets Load GIF feed GIF Optimise (path) and GIF Analyse / Compare (gif_a) directly.
+    RETURN_TYPES = ("IMAGE", "MASK", "FLOAT", "INT", "STRING", "STRING")
+    RETURN_NAMES = ("images", "mask", "fps", "frame_count", "delays_ms", "gif_path")
 
     @classmethod
     def INPUT_TYPES(cls) -> InputTypes:
@@ -414,16 +424,18 @@ class JWTFLoadGif:
     def IS_CHANGED(cls, gif: str = "", path: str = "", **_: object) -> str:
         return JWTFGifOptimise.IS_CHANGED(gif, path)
 
-    def run(self, gif: str, path: str = "", max_frames: int = 0) -> tuple[torch.Tensor, torch.Tensor, float, int, str]:
+    def run(self, gif: str, path: str = "", max_frames: int = 0) -> tuple[torch.Tensor, torch.Tensor, float, int, str, str]:
         limit = check_int("max_frames", max_frames, 0, 10000)
-        g = read_gif(resolve_existing_file(path.strip() or gif, read_roots()))
+        real = resolve_existing_file(path.strip() or gif, read_roots())
+        g = read_gif(real)
         frames, alphas, durations = g.frames, g.alphas, g.durations
         if limit:
             frames, alphas, durations = frames[:limit], alphas[:limit], durations[:limit]
         images = frames_to_tensor(frames)
         mask: NDArray[np.float32] = 1.0 - np.stack(alphas).astype(np.float32) / 255.0  # ComfyUI mask: 1 = transparent
         fps = len(durations) / sum(durations) if sum(durations) else 0.0
-        return images, torch.from_numpy(mask), float(fps), len(frames), json.dumps([round(d * 1000) for d in durations])
+        return (images, torch.from_numpy(mask), float(fps), len(frames),
+                json.dumps([round(d * 1000) for d in durations]), os.path.abspath(real))
 
 
 class JWTFFramesToAnimated:

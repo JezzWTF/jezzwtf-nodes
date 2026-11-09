@@ -116,12 +116,29 @@ def test_gif_optimise_round_trip_and_load_gif(dirs: dict[str, str]) -> None:
     assert loaded[3] == 30 and loaded[0].shape[0] == 30 and loaded[1].shape[0] == 30
     assert loaded[2] == pytest.approx(20.0, rel=0.01)
     assert json.loads(loaded[4]) == [50] * 30
+    assert os.path.basename(loaded[5]) == "ünï src.gif"  # the path output feeds Optimise and Compare
+    assert JWTFLoadGif.RETURN_NAMES[-1] == "gif_path"
     assert float(loaded[1].max()) == 0.0  # opaque GIF: mask is all 0
     # the optimised GIF is loadable by path (outside the input folder, inside output)
     again = JWTFLoadGif().run("", path=path)
     assert again[3] == preview.shape[0]
     with pytest.raises(ValueError):
         JWTFLoadGif().run("", path=os.path.join(dirs["input"], "..", "..", "windows", "x.gif"))
+
+
+def test_optimise_accepts_a_wired_path_with_the_placeholder_picker(dirs: dict[str, str]) -> None:
+    """A shared workflow keeps the picker at its placeholder value; that must validate and not be needed."""
+    from gif_tools.nodes import USE_PATH
+
+    assert JWTFGifOptimise.INPUT_TYPES()["required"]["gif"][0][0] == USE_PATH
+    clip = synth.motion_clip(10)
+    path = os.path.join(dirs["input"], "p.gif")
+    with open(path, "wb") as fh:
+        fh.write(gifio.encode_with_pillow(clip.frames, [5] * 10, 64, "none", 0))
+    out = JWTFGifOptimise().run(USE_PATH, "smallest", "opt", path=path, compare_naive=False)
+    assert out["result"][0].endswith(".gif")
+    with pytest.raises(ValueError, match="connect a path"):
+        JWTFGifOptimise().run(USE_PATH, "smallest", "opt", compare_naive=False)
 
 
 def test_load_gif_mask_from_transparency(dirs: dict[str, str]) -> None:
@@ -133,7 +150,8 @@ def test_load_gif_mask_from_transparency(dirs: dict[str, str]) -> None:
     other[5:10, 20:25] = (30, 200, 30, 255)
     path = os.path.join(dirs["input"], "t.gif")
     Image.fromarray(rgba, "RGBA").save(path, save_all=True, append_images=[Image.fromarray(other, "RGBA")], duration=[100, 100], loop=0, disposal=2)
-    images, mask, fps, count, delays = JWTFLoadGif().run("t.gif")
+    images, mask, fps, count, delays, gif_path = JWTFLoadGif().run("t.gif")
+    assert gif_path == os.path.abspath(path)
     assert count == 2 and mask.shape == (2, 20, 30)
     assert float(mask[0, 0, 0]) == 1.0 and float(mask[0, 0, 29]) == 0.0
     assert fps == pytest.approx(10.0)

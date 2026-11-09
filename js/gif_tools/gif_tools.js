@@ -99,6 +99,14 @@ function buildPreview(node) {
   return api_;
 }
 
+/** When a path is wired in (for example from Load GIF), the file picker is not used, so grey it out. */
+function syncPickerWithPath(node) {
+  const picker = node.widgets?.find((w) => w.name === "gif");
+  if (!picker) return;
+  const pathInput = node.inputs?.find((i) => i.name === "path");
+  setWidgetDisabled(picker, pathInput?.link != null);
+}
+
 function buildTextPanel(node) {
   ensureStyle();
   const box = document.createElement("div");
@@ -121,6 +129,7 @@ app.registerExtension({
       const r = onCreated?.apply(this, args);
       if (isPreview) {
         this.__jwtfGif = buildPreview(this);
+        if (name === "JWTFGifOptimise") syncPickerWithPath(this);
         if (name !== "JWTFFramesToAnimated") {
           const modeWidget = this.widgets?.find((w) => w.name === "mode");
           if (modeWidget) {
@@ -161,9 +170,17 @@ app.registerExtension({
       if (typeof text === "string" && this.__jwtfText) this.__jwtfText.set(text);
     };
 
+    const onConnectionsChange = nodeType.prototype.onConnectionsChange;
+    nodeType.prototype.onConnectionsChange = function (...args) {
+      const r = onConnectionsChange?.apply(this, args);
+      if (name === "JWTFGifOptimise") syncPickerWithPath(this);
+      return r;
+    };
+
     const onConfigure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function (...args) {
       const r = onConfigure?.apply(this, args);
+      if (name === "JWTFGifOptimise") syncPickerWithPath(this);
       if (isPreview) {
         // Saved workflows come back with their last result so the card is not blank after a reload.
         if (name !== "JWTFFramesToAnimated") applyModeRules(this);

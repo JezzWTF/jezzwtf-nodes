@@ -1,0 +1,240 @@
+{
+  "sections": [
+    {
+      "title": "Start here",
+      "topics": [
+        {
+          "id": "welcome",
+          "title": "Welcome",
+          "file": "welcome.md",
+          "keywords": "overview start about help windows"
+        },
+        {
+          "id": "install",
+          "title": "Install and requirements",
+          "file": "install.md",
+          "keywords": "install manager git comfyui version ffmpeg optional packages"
+        },
+        {
+          "id": "saved-files",
+          "title": "Where files are saved",
+          "file": "saved-files.md",
+          "keywords": "output folder save path filename_prefix refmods characters chats captions history cache"
+        },
+        {
+          "id": "example-workflows",
+          "title": "Example workflows",
+          "file": "example-workflows.md",
+          "keywords": "templates workflows examples"
+        },
+        {
+          "id": "troubleshooting",
+          "title": "Troubleshooting",
+          "file": "troubleshooting.md",
+          "keywords": "error problem fix missing value not in list restart ffmpeg odd size"
+        }
+      ]
+    },
+    {
+      "title": "Utilities",
+      "topics": [
+        {
+          "id": "set-get",
+          "title": "Set and Get (Remote)",
+          "file": "set-get.md",
+          "keywords": "wireless remote key value pass"
+        },
+        {
+          "id": "text-nodes",
+          "title": "Text nodes",
+          "file": "text-nodes.md",
+          "keywords": "text box zero negative title font edit prompt template"
+        },
+        {
+          "id": "duration-resolution",
+          "title": "Duration to Frames and Resolution Picker",
+          "file": "duration-resolution.md",
+          "keywords": "frames seconds fps h3 17n+5 aspect megapixels latent"
+        },
+        {
+          "id": "image-nodes",
+          "title": "Image nodes",
+          "file": "image-nodes.md",
+          "keywords": "match size get image draw image multi load aspect mask"
+        },
+        {
+          "id": "dataset",
+          "title": "Dataset captioning nodes",
+          "file": "dataset.md",
+          "keywords": "folder batch save caption lora training txt"
+        },
+        {
+          "id": "batch-timer",
+          "title": "Batch Timer and Refresh Page",
+          "file": "batch-timer.md",
+          "keywords": "eta progress vram clean reload"
+        },
+        {
+          "id": "gallery-load",
+          "title": "Gallery Load",
+          "file": "gallery-load.md",
+          "keywords": "gallery images picker load batch thumbnails folder input output multi select"
+        }
+      ]
+    },
+    {
+      "title": "Run Timer",
+      "topics": [
+        {
+          "id": "run-timer",
+          "title": "Run Timer and history",
+          "file": "run-timer.md",
+          "keywords": "timer clock history duration stopwatch runs csv"
+        }
+      ]
+    },
+    {
+      "title": "Characters and LLMs",
+      "topics": [
+        {
+          "id": "character-chat",
+          "title": "Character Chat",
+          "file": "character-chat.md",
+          "keywords": "chat roleplay qwen card lorebook save chat"
+        },
+        {
+          "id": "character-cards",
+          "title": "Character card bakers",
+          "file": "character-cards.md",
+          "keywords": "card png v2 baker refmod safetensors workflow png"
+        },
+        {
+          "id": "lm-studio",
+          "title": "LM Studio nodes",
+          "file": "lm-studio.md",
+          "keywords": "lm studio llm vision streaming prompt box"
+        },
+        {
+          "id": "bounding-boxes",
+          "title": "Bounding Boxes and Layout LLM Prompt",
+          "file": "bounding-boxes.md",
+          "keywords": "layout boxes regions llm"
+        }
+      ]
+    },
+    {
+      "title": "Loaders and LoRA",
+      "topics": [
+        {
+          "id": "loaders",
+          "title": "Model loaders",
+          "file": "loaders.md",
+          "keywords": "diffusers ultimate model loader attention quantisation clip vae"
+        },
+        {
+          "id": "lora",
+          "title": "LoRA nodes",
+          "file": "lora.md",
+          "keywords": "lora stack folder inspector civitai regional character"
+        }
+      ]
+    },
+    {
+      "title": "MiniMax H3",
+      "topics": [
+        {
+          "id": "refmod",
+          "title": "What is a RefMod?",
+          "file": "refmod.md",
+          "keywords": "refmod reference character safetensors bundle bake apply"
+        },
+        {
+          "id": "refmod-nodes",
+          "title": "RefMod Bake, Loader and Apply",
+          "file": "refmod-nodes.md",
+          "keywords": "bake apply loader retention curve scramble extra_mods models refmods"
+        },
+        {
+          "id": "refmod-more",
+          "title": "Tail and Image RefMod",
+          "file": "refmod-more.md",
+          "keywords": "tail capture load unified qwen fibo flux"
+        },
+        {
+          "id": "h3-generate",
+          "title": "H3 Image Edit, samplers and upscale",
+          "file": "h3-generate.md",
+          "keywords": "image edit ksampler preview upscale picker"
+        }
+      ]
+    },
+    {
+      "title": "Audio",
+      "topics": [
+        {
+          "id": "audio",
+          "title": "Audio Loader and Album Cover",
+          "file": "audio.md",
+          "keywords": "audio loader upload mp3 flac wav album cover art tag embed picture trim mono"
+        }
+      ]
+    },
+    {
+      "title": "Video",
+      "topics": [
+        {
+          "id": "prompt-relay",
+          "title": "Prompt Relay",
+          "file": "prompt-relay.md",
+          "keywords": "ltx segments timeline temporal prompts"
+        },
+        {
+          "id": "video-compare",
+          "title": "Video Compare",
+          "file": "video-compare.md",
+          "keywords": "compare wipe slider a b video image"
+        }
+      ]
+    },
+    {
+      "title": "GIF Tools",
+      "topics": [
+        {
+          "id": "gif-tools",
+          "title": "GIF Tools",
+          "file": "gif-tools.md",
+          "keywords": "gif optimise optimize size quality palette dither target size webp apng load gif compare ssim"
+        }
+      ]
+    },
+    {
+      "title": "Windows and panels",
+      "topics": [
+        {
+          "id": "paste-stack",
+          "title": "Paste Stack",
+          "file": "paste-stack.md",
+          "keywords": "clipboard history copy paste images text files"
+        },
+        {
+          "id": "workflows-window",
+          "title": "Workflows window",
+          "file": "workflows-window.md",
+          "keywords": "workflow browser thumbnails search favourites folders examples"
+        },
+        {
+          "id": "docs-window",
+          "title": "Documentation window",
+          "file": "docs-window.md",
+          "keywords": "docs help search topics"
+        },
+        {
+          "id": "canvas-tools",
+          "title": "Canvas tools",
+          "file": "canvas-tools.md",
+          "keywords": "canvas tidy align distribute group bypass slash gesture layout dependency shortcut"
+        }
+      ]
+    }
+  ]
+}

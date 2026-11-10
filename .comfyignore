@@ -6,3 +6,4 @@ assets/
 .vscode/
 *.md.bak
 CONTRIBUTING.md
+tools/

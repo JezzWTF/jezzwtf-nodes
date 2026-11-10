@@ -73,8 +73,11 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 | Get Image | Grab an in-graph image as IMAGE and MASK |
 | Draw Image | Layered sketch pad that loads like Load Image, with pressure, undo and zoom |
 | Multi Load Image | Up to 16 image slots, each with its own output |
+| Mask Composite | Combine two masks at an offset with replace, add, subtract, multiply, min, max, difference or xor, plus opacity, inversion and a soft edge |
 | Gallery Load | Pick one or many images in a floating gallery window (input or output folders, folders, search) and load them as a batch |
-| Multi Switch | Route several values by one switch |
+| Switch | Pick one of two inputs with a true/false switch; the output takes the connected type and only the chosen side is computed |
+| Route | Send one input to the true or the false output; nodes on the other output are skipped |
+| Multi Switch | Up to six true/false pairs behind one switch, each pair with its own typed output |
 | Folder Image Batch / Folder Video Batch | One file per run from a folder, with whole-folder auto-run |
 | Save Caption (Match Image) | Save a caption as a `.txt` named after the file just loaded |
 | Batch Timer | Counts finished items across queued prompts, with progress and ETA |
@@ -129,6 +132,7 @@ A RefMod is a `.safetensors` file of reference latents (portraits, a short clip,
 | MiniMax H3 Image Edit | One-node H3 image edit |
 | H3 Upscale Picker | Same-scale target sizes for the H3 latent upscaler |
 | Ultimate KSampler / H3 KSampler | Samplers with live video preview |
+| Model Preview Mirror | Pass-through that shows a sampler's live preview in its own panel |
 
 ## Audio
 
@@ -166,7 +170,7 @@ Uses ffmpeg (the `imageio-ffmpeg` build, a system ffmpeg, or the `JWTF_FFMPEG` e
 
 - **JezzWTF Workflows** opens a floating browser for saved workflows with graph previews, folder filters, search and favourites.
 - **JezzWTF Documentation** opens a floating editor for searchable pages that travel with the saved workflow. Both panels are available from the canvas context menu and command palette.
-- **Paste Stack**: a floating clipboard history for text, images and files. Click a card to copy it back, or drag an image card onto a Load Image node. Persists across reloads and minimizes to a chip.
+- **Paste Stack**: a floating clipboard history for text, images and files. Click a card to copy it back, or drag an image card onto a Load Image node. Persists across reloads and minimizes to a chip, over an optional animated backdrop.
 - **Workflows window**: browse your saved workflows and the bundled examples as cards with thumbnails. Search looks inside workflows (models, prompts, notes), with folders, favourites and what-it-makes and model categories. A floating panel like Paste Stack: it never blocks the canvas and remembers its place. Open it from the top bar, Alt+Shift+W, the canvas right-click menu or the command palette.
 - **Canvas tools**: tidy a graph by dependency, align and distribute, group the selection, and a Ctrl+Alt bypass slash. They live in the command palette (Alt+Shift+T tidies, Alt+Shift+G groups).
 - **Documentation window**: a floating, searchable, read-only help for every node in the pack, including where each node saves its files (Alt+Shift+D).

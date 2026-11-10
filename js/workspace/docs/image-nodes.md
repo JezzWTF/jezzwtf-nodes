@@ -19,3 +19,12 @@ Up to 16 image slots, each with its own output. Upload, paste or drop images, ho
 ## Image Aspect Size
 
 Outputs a size that keeps an image's aspect ratio inside a target.
+
+## Mask Composite
+
+Combines two masks. The `source` is placed on the `destination` with its top-left corner at `x`, `y` (negative values move it off the top or left), and the parts that fall outside the destination are cut off. The result is the destination's size.
+
+- `operation`: *replace*, *add*, *subtract* (destination minus source), *multiply*, *min*, *max*, *difference* or *xor*. Values always stay between 0 and 1.
+- `opacity` controls how much of the combined result replaces the destination; 0 leaves it unchanged.
+- `invert_source` flips the source first, and `feather` blurs its edges by about that many pixels so the join is soft.
+- A batch on either side repeats against a shorter one, so one source mask can be applied to every mask in a batch.

@@ -248,14 +248,14 @@
 }
 
 /* Circular face: a progress ring around the clock. It fills towards the average of past runs while one is going. */
-.jwtf-rt-node .jwtf-rt-ring { display: none; }
+.jwtf-rt-node .jwtf-rt-ring { display: none; overflow: visible; }
 .jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-ring { display: block; position: absolute; inset: 3%; width: 94%; height: 94%; }
 .jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-card { border-radius: 50%; }
 .jwtf-rt-node .jwtf-rt-ring-track { stroke: rgba(128, 128, 140, 0.22); }
 /* Lap colours: even laps use the tint, odd laps the accent turned round the colour wheel. */
 .jwtf-rt-node .jwtf-rt-lap-a { stroke: var(--rt-tint); }
 .jwtf-rt-node .jwtf-rt-lap-b { stroke: var(--rt-color-2, #56c8ff); }
-.jwtf-rt-node .jwtf-rt-ring-arc { opacity: 0.75; transition: stroke-dashoffset 0.12s linear; }
+.jwtf-rt-node .jwtf-rt-ring-arc { opacity: 0.75; }
 .jwtf-rt-node[data-status="running"] .jwtf-rt-ring-arc { opacity: 1; filter: drop-shadow(0 0 3px var(--rt-tint)); }
 .jwtf-rt-node .jwtf-rt-ring-prev { opacity: 0; }
 .jwtf-rt-node .jwtf-rt-ring-prev.on { opacity: 0.9; }
@@ -267,14 +267,28 @@
 .jwtf-rt-node .jwtf-rt-ticks line.jwtf-rt-tick-off { stroke: rgba(128, 128, 140, 0.25); }
 .jwtf-rt-node .jwtf-rt-ticks line { stroke-opacity: 0.8; }
 .jwtf-rt-node[data-status="running"] .jwtf-rt-ticks line { stroke-opacity: 1; }
-.jwtf-rt-node[data-anim="comet"][data-rest="0"] .jwtf-rt-comet { display: block; }
+/* Comet: the box matches the SVG, so ring radius 41 and stroke 4.2 become 78%..86% of it. */
+.jwtf-rt-node[data-face="ring"][data-anim="comet"][data-rest="0"] .jwtf-rt-comet {
+  display: block; position: absolute; inset: 3%; width: 94%; height: 94%; color: var(--rt-tint); pointer-events: none; will-change: transform;
+}
+.jwtf-rt-node .jwtf-rt-comet[data-lap="b"] { color: var(--rt-color-2, #56c8ff); }
+.jwtf-rt-node .jwtf-rt-comet-tail {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from -150deg, transparent 0deg, currentColor 150deg, transparent 150.3deg);
+  -webkit-mask: radial-gradient(circle farthest-side at 50% 50%, transparent 77.4%, #000 78.2%, #000 85.8%, transparent 86.6%);
+  mask: radial-gradient(circle farthest-side at 50% 50%, transparent 77.4%, #000 78.2%, #000 85.8%, transparent 86.6%);
+}
+.jwtf-rt-node .jwtf-rt-comet-head {
+  position: absolute; left: calc(50% - 3.4%); top: calc(9% - 3.4%); width: 6.8%; height: 6.8%; border-radius: 50%;
+  background: color-mix(in srgb, currentColor 55%, white); box-shadow: 0 0 0.9em 0.1em currentColor;
+}
 .jwtf-rt-node[data-anim="comet"][data-rest="0"] .jwtf-rt-ring-arc,
 .jwtf-rt-node[data-anim="comet"][data-rest="0"] .jwtf-rt-ring-prev { display: none; }
 .jwtf-rt-node[data-face="ring"] .jwtf-rt-readout { font-size: calc(min(17cqw, 50cqh) * var(--rt-scale, 1)); }
 .jwtf-rt-node[data-face="ring"] .jwtf-rt-readout[data-groups="3"] { font-size: calc(min(12cqw, 36cqh) * var(--rt-scale, 1)); }
 .jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-dot { left: 50%; top: 17%; transform: translateX(-50%); }
 .jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-caption { top: 24%; max-width: 46%; }
-.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-foot { left: 24%; right: 24%; bottom: 20%; justify-content: center; flex-wrap: nowrap; }
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-foot { left: 0; right: 0; bottom: 12%; justify-content: center; flex-wrap: nowrap; gap: clamp(4px, 2.5cqmin, 10px); }
 .jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-stats { display: none; }
 .jwtf-rt-node .jwtf-rt-style-btn { margin-left: 0; }
 
@@ -383,6 +397,56 @@
 .jwtf-rt-swatch[aria-pressed="true"] { border-color: #fff; }
 .jwtf-rt-color { width: 26px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; }
 
+/* Round faces and small timers: the two buttons become round icon buttons that are easy to hit, each with a wider
+   invisible target. History is a list glyph and style is a gear. */
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-open { --rt-btn: clamp(22px, 10cqmin, 36px); }
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-open {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--rt-btn, 24px);
+  height: var(--rt-btn, 24px);
+  padding: 0;
+  margin: 0;
+  font-size: 0;
+  border-radius: 50%;
+  color: #c9c9d1;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-open::before { content: "\2630"; font-size: calc(var(--rt-btn, 24px) * 0.55); line-height: 1; }
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-style-btn::before { content: "\2699"; }
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-open::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+.jwtf-rt-node:is([data-face="ring"], [data-face="analog"]) .jwtf-rt-open:hover { color: #fff; background: rgba(255, 255, 255, 0.22); }
+
+/* Small timers: drop the extras and keep the clock and the two buttons. */
+@container jwtfrt (max-width: 170px) {
+  .jwtf-rt-node .jwtf-rt-caption, .jwtf-rt-node .jwtf-rt-stats { display: none; }
+  .jwtf-rt-node .jwtf-rt-foot { justify-content: center; gap: 6px; }
+  .jwtf-rt-node .jwtf-rt-open { --rt-btn: 24px; }
+  .jwtf-rt-node .jwtf-rt-open {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--rt-btn, 24px);
+    height: var(--rt-btn, 24px);
+    padding: 0;
+    margin: 0;
+    font-size: 0;
+    border-radius: 50%;
+    color: #c9c9d1;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  }
+    .jwtf-rt-node .jwtf-rt-open::before { content: "\2630"; font-size: calc(var(--rt-btn, 24px) * 0.55); line-height: 1; }
+    .jwtf-rt-node .jwtf-rt-style-btn::before { content: "\2699"; }
+    .jwtf-rt-node .jwtf-rt-open::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+    .jwtf-rt-node .jwtf-rt-open:hover { color: #fff; background: rgba(255, 255, 255, 0.22); }
+}
+@container jwtfrt (max-width: 130px) {
+  .jwtf-rt-node .jwtf-rt-dot { display: none; }
+}
+
 /* Floating Run Timer: no frame of its own, so the circular face is a true circle. */
 .jwtf-rt-float {
   position: fixed;
@@ -409,7 +473,7 @@
 /* ---- Analog stopwatch face */
 .jwtf-rt-node .jwtf-rt-dial { display: none; }
 .jwtf-rt-node[data-face="analog"] .jwtf-rt-dial { display: block; }
-.jwtf-rt-node[data-face="analog"] :is(.jwtf-rt-ring-track, .jwtf-rt-ring-arc, .jwtf-rt-ring-prev, .jwtf-rt-ticks, .jwtf-rt-comet) { display: none; }
+.jwtf-rt-node[data-face="analog"] :is(.jwtf-rt-ring-track, .jwtf-rt-ring-arc, .jwtf-rt-ring-prev, .jwtf-rt-ticks, .jwtf-rt-comet) { display: none !important; }
 .jwtf-rt-node .jwtf-rt-tick-major { stroke: var(--rt-tint); }
 .jwtf-rt-node .jwtf-rt-tick-minor { stroke: rgba(150, 150, 165, 0.55); }
 .jwtf-rt-node .jwtf-rt-subdial { stroke: rgba(150, 150, 165, 0.45); }
@@ -464,5 +528,5 @@
 }
 .jwtf-rt-node[data-skin="neon"] .jwtf-rt-ring-track { stroke: color-mix(in srgb, var(--rt-tint) 14%, transparent); }
 .jwtf-rt-node[data-skin="neon"] :is(.jwtf-rt-ring-arc, .jwtf-rt-ring-prev) { filter: drop-shadow(0 0 2px var(--rt-tint)) drop-shadow(0 0 6px var(--rt-tint)); }
-.jwtf-rt-node[data-skin="neon"] :is(.jwtf-rt-ticks line, .jwtf-rt-comet circle, .jwtf-rt-tick-major, .jwtf-rt-hand) { filter: drop-shadow(0 0 2.5px var(--rt-tint)); }
+.jwtf-rt-node[data-skin="neon"] :is(.jwtf-rt-ticks line, .jwtf-rt-comet-tail, .jwtf-rt-tick-major, .jwtf-rt-hand) { filter: drop-shadow(0 0 2.5px var(--rt-tint)); }
 .jwtf-rt-node[data-skin="neon"] .jwtf-rt-tick-minor { stroke: color-mix(in srgb, var(--rt-tint) 38%, transparent); }

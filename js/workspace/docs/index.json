@@ -79,6 +79,12 @@
           "title": "Gallery Load",
           "file": "gallery-load.md",
           "keywords": "gallery images picker load batch thumbnails folder input output multi select"
+        },
+        {
+          "id": "switches",
+          "title": "Switch, Route and Multi Switch",
+          "file": "switches.md",
+          "keywords": "switch multi switch route routing choose select true false if else branch toggle string prompt lazy route split fan out divert"
         }
       ]
     },

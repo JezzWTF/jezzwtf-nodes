@@ -9,3 +9,7 @@ A floating clipboard history for text, images and files.
 - The stack survives reloads and minimises to a chip.
 
 The helper only answers requests from your own machine and never writes clipboard contents to disk.
+
+## Backdrop
+
+Behind the cards there is a slowly drifting teal and violet backdrop with a soft glow that follows the pointer, a ripple where you click, paste or drop, and a brightness that rises as the stack fills. It is only decoration. It uses WebGL2 at half resolution, at most 30 frames a second, and pauses when the tab is hidden or the panel is minimised; with reduced motion it draws still frames only. Turn it off in Settings → JezzWTF Paste Stack: animated backdrop. Without WebGL2 the panel keeps its plain gradient.

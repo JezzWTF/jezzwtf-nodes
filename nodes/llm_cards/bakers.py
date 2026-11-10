@@ -94,15 +94,15 @@ class JWTFV2PNGBaker(io.ComfyNode):
             display_name='Character Card PNG Baker',
             category='JezzWTF/Cards',
             inputs=[
-                io.Image.Input("image"),
-                io.String.Input("json_text", multiline=True, force_input=True),
-                io.String.Input("filename_prefix", default='V2_cards/%name%'),
-                io.Boolean.Input("fill_missing_fields", default=True, label_on='fill missing V2 fields', label_off='keep JSON exactly as pasted'),
-                io.Combo.Input("save_to", options=[SAVE_TO_CHARACTERS, SAVE_TO_OUTPUT], default='characters folder', optional=True),
+                io.Image.Input("image", tooltip="Images to save as PNGs with the same character card embedded in each one."),
+                io.String.Input("json_text", multiline=True, force_input=True, tooltip="Character card JSON to parse and embed in each PNG."),
+                io.String.Input("filename_prefix", default='V2_cards/%name%', tooltip="Relative subfolder and filename prefix, with %name% replaced by the sanitised character name."),
+                io.Boolean.Input("fill_missing_fields", default=True, label_on='fill missing V2 fields', label_off='keep JSON exactly as pasted', tooltip="Fills missing V2 fields with defaults when enabled."),
+                io.Combo.Input("save_to", options=[SAVE_TO_CHARACTERS, SAVE_TO_OUTPUT], default='characters folder', optional=True, tooltip="Chooses between ComfyUI's input/characters directory and its output directory."),
             ],
             outputs=[
-                io.String.Output("saved_path"),
-                io.String.Output("character_name"),
+                io.String.Output("saved_path", tooltip="Paths to all saved character PNGs, one per line."),
+                io.String.Output("character_name", tooltip="Character name read from the embedded card."),
             ],
             is_output_node=True,
         )
@@ -194,12 +194,12 @@ class JWTFWorkflowPNGBaker(io.ComfyNode):
             display_name='Workflow PNG Baker',
             category='JezzWTF/Cards',
             inputs=[
-                io.Image.Input("image"),
-                io.String.Input("json_text", multiline=True, force_input=True),
-                io.String.Input("filename_prefix", default='Workflow_PNG/workflow'),
+                io.Image.Input("image", tooltip="Images to save as PNGs with the supplied workflow metadata embedded in each one."),
+                io.String.Input("json_text", multiline=True, force_input=True, tooltip="ComfyUI workflow JSON, API prompt JSON or a wrapper containing one or both."),
+                io.String.Input("filename_prefix", default='Workflow_PNG/workflow', tooltip="Relative subfolder and filename prefix under ComfyUI's output directory."),
             ],
             outputs=[
-                io.String.Output("saved_path"),
+                io.String.Output("saved_path", tooltip="Paths to all saved workflow PNGs, one per line."),
             ],
             is_output_node=True,
         )

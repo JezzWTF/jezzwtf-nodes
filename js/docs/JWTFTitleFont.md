@@ -6,21 +6,21 @@ Styled title banner for organising workflows.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `text` | Text. (default: TITLE) | STRING | Yes |  |
-| `font_size` | Font size. (default: 56) | INT | Yes | 8 to 240 |
-| `bold` | Bold. (default: true) | BOOLEAN | Yes |  |
-| `glow` | Glow. (default: true) | BOOLEAN | Yes |  |
-| `style` | Style. (default: `Gradient`) | COMBO | Yes | `"Solid"`<br>`"Gradient"`<br>`"Neon"`<br>`"Rainbow"`<br>`"Outline"`<br>`"Chrome"` |
-| `color_a` | Color a. (default: #ff3d7f) | STRING | Yes |  |
-| `color_b` | Color b. (default: #3da5ff) | STRING | Yes |  |
-| `animate` | Animate. (default: `None`) | COMBO | Yes | `"None"`<br>`"Pulse"`<br>`"Float"`<br>`"Shimmer"`<br>`"Rainbow Shift"`<br>`"Glow Pulse"` |
-| `url` | Url. | STRING | Yes |  |
+| `text` | Text shown in the canvas title and returned to downstream nodes. (default: TITLE) | STRING | Yes |  |
+| `font_size` | Canvas title size in pixels. (default: 56) | INT | Yes | 8 to 240 |
+| `bold` | Draws the canvas title in bold when enabled. (default: true) | BOOLEAN | Yes |  |
+| `glow` | Adds a glow to the canvas title when enabled. (default: true) | BOOLEAN | Yes |  |
+| `style` | Visual treatment applied to the canvas title. (default: `Gradient`) | COMBO | Yes | `"Solid"`<br>`"Gradient"`<br>`"Neon"`<br>`"Rainbow"`<br>`"Outline"`<br>`"Chrome"` |
+| `color_a` | Primary hex colour used to render the title. (default: #ff3d7f) | STRING | Yes |  |
+| `color_b` | Secondary hex colour used by title styles with two colours. (default: #3da5ff) | STRING | Yes |  |
+| `animate` | Canvas title animation, with None leaving it static. (default: `None`) | COMBO | Yes | `"None"`<br>`"Pulse"`<br>`"Float"`<br>`"Shimmer"`<br>`"Rainbow Shift"`<br>`"Glow Pulse"` |
+| `url` | Optional link opened from the canvas title. | STRING | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `TEXT` | Text. | STRING |
+| `TEXT` | Title text passed through as a plain string. | STRING |
 
 Notes:
 

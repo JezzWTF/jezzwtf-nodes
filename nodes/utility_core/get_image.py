@@ -47,14 +47,14 @@ class JWTFGetImage(io.ComfyNode):
             display_name='Get Image',
             category='JezzWTF/image',
             inputs=[
-                io.Image.Input("image"),
-                io.Boolean.Input("invert_mask", default=False, optional=True),
-                io.Float.Input("mask_threshold", default=0.0, min=0.0, max=1.0, step=0.01, optional=True),
-                io.Combo.Input("mask_mode", options=list(MASK_MODES), default='Alpha Channel', optional=True),
+                io.Image.Input("image", tooltip="Source pixels to preview and use for mask extraction."),
+                io.Boolean.Input("invert_mask", default=False, optional=True, tooltip="Flips black and white in the mask after any threshold is applied."),
+                io.Float.Input("mask_threshold", default=0.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Binarises the mask by keeping values strictly above this cutoff, with 0 leaving the mask continuous."),
+                io.Combo.Input("mask_mode", options=list(MASK_MODES), default='Alpha Channel', optional=True, tooltip="Uses inverse alpha or inverse luminance, with a zero mask when the selected channel data is unavailable."),
             ],
             outputs=[
-                io.Image.Output("IMAGE"),
-                io.Mask.Output("MASK"),
+                io.Image.Output("IMAGE", tooltip="Source image with any alpha channel removed."),
+                io.Mask.Output("MASK", tooltip="Mask computed from the selected channel data, threshold and inversion."),
             ],
             is_output_node=True,
         )

@@ -66,13 +66,13 @@ class JWTFLoraStack(io.ComfyNode):
             category='JezzWTF/lora',
             description='Apply a stack of LoRAs from models/loras, edited as a visual list.',
             inputs=[
-                io.Model.Input("model"),
-                io.String.Input("lora_data", default='{}', multiline=False),
-                io.Clip.Input("clip", optional=True),
+                io.Model.Input("model", tooltip="Diffusion model to patch with the enabled LoRAs."),
+                io.String.Input("lora_data", default='{}', multiline=False, tooltip="JSON list of LoRA selections, enable flags and strengths written by the stack editor."),
+                io.Clip.Input("clip", optional=True, tooltip="Optional text encoder to patch with the enabled LoRAs."),
             ],
             outputs=[
-                io.Model.Output("MODEL"),
-                io.Clip.Output("CLIP"),
+                io.Model.Output("MODEL", tooltip="Model with the enabled LoRAs applied in stack order."),
+                io.Clip.Output("CLIP", tooltip="Text encoder with its LoRA patches applied, or empty when no encoder was connected."),
             ],
         )
 
@@ -96,15 +96,15 @@ class JWTFLoraFolderStack(io.ComfyNode):
             category='JezzWTF/lora',
             description='Apply LoRAs picked from one subfolder of models/loras, each with its own on/off and strength.',
             inputs=[
-                io.Model.Input("model"),
+                io.Model.Input("model", tooltip="Diffusion model to patch with enabled LoRAs from the selected folder."),
                 io.String.Input("folder", default='', multiline=False, tooltip='Subfolder of models/loras (blank = the root folder itself).'),
-                io.String.Input("lora_data", default='{}', multiline=False),
-                io.Clip.Input("clip", optional=True),
+                io.String.Input("lora_data", default='{}', multiline=False, tooltip="JSON list of LoRA selections, enable flags and strengths written by the stack editor."),
+                io.Clip.Input("clip", optional=True, tooltip="Optional text encoder to patch with the enabled LoRAs."),
             ],
             outputs=[
-                io.Model.Output("MODEL"),
-                io.Clip.Output("CLIP"),
-                io.String.Output("applied"),
+                io.Model.Output("MODEL", tooltip="Model with the enabled LoRAs applied in stack order."),
+                io.Clip.Output("CLIP", tooltip="Text encoder with its LoRA patches applied, or empty when no encoder was connected."),
+                io.String.Output("applied", tooltip="Summary of applied LoRAs and their strengths."),
             ],
         )
 
@@ -137,23 +137,23 @@ class JWTFLoraFolderStackMulti(JWTFLoraFolderStack):
             category='JezzWTF/lora',
             description='Folder LoRA stack applied to up to five models (CLIP only on the first).',
             inputs=[
-                io.Model.Input("model"),
+                io.Model.Input("model", tooltip="First diffusion model to patch with the stack."),
                 io.String.Input("folder", default='', multiline=False, tooltip='Subfolder of models/loras (blank = the root folder itself).'),
-                io.String.Input("lora_data", default='{}', multiline=False),
-                io.Clip.Input("clip", optional=True),
-                io.Model.Input("model_2", optional=True),
-                io.Model.Input("model_3", optional=True),
-                io.Model.Input("model_4", optional=True),
-                io.Model.Input("model_5", optional=True),
+                io.String.Input("lora_data", default='{}', multiline=False, tooltip="JSON list of LoRA selections, enable flags and strengths written by the stack editor."),
+                io.Clip.Input("clip", optional=True, tooltip="Optional text encoder patched alongside the first diffusion model."),
+                io.Model.Input("model_2", optional=True, tooltip="Second model to patch with the same stack."),
+                io.Model.Input("model_3", optional=True, tooltip="Third model to patch with the same stack."),
+                io.Model.Input("model_4", optional=True, tooltip="Fourth model to patch with the same stack."),
+                io.Model.Input("model_5", optional=True, tooltip="Fifth model to patch with the same stack."),
             ],
             outputs=[
-                io.Model.Output("MODEL"),
-                io.Clip.Output("CLIP"),
-                io.String.Output("applied"),
-                io.Model.Output("MODEL 2"),
-                io.Model.Output("MODEL 3"),
-                io.Model.Output("MODEL 4"),
-                io.Model.Output("MODEL 5"),
+                io.Model.Output("MODEL", tooltip="First model with the enabled LoRAs applied in stack order."),
+                io.Clip.Output("CLIP", tooltip="Text encoder patched alongside the first model, or empty when no encoder was connected."),
+                io.String.Output("applied", tooltip="Summary of the LoRAs applied to the first model, including their strengths."),
+                io.Model.Output("MODEL 2", tooltip="Patched second model, or empty when its input is disconnected."),
+                io.Model.Output("MODEL 3", tooltip="Patched third model, or empty when its input is disconnected."),
+                io.Model.Output("MODEL 4", tooltip="Patched fourth model, or empty when its input is disconnected."),
+                io.Model.Output("MODEL 5", tooltip="Patched fifth model, or empty when its input is disconnected."),
             ],
         )
 

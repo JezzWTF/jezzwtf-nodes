@@ -6,18 +6,18 @@ Layered sketch pad that loads like Load Image, with pressure, undo and zoom.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `width` | Width in pixels. (default: 1024) | INT | Yes | 64 to 8192 (step 8) |
-| `height` | Height in pixels. (default: 1024) | INT | Yes | 64 to 8192 (step 8) |
-| `background` | Background. (default: `white`) | COMBO | Yes | `"white"`<br>`"black"`<br>`"transparent"` |
-| `image` | The input image. | STRING | Yes |  |
-| `drawing_state` | Drawing state. | STRING | Yes |  |
+| `width` | Canvas width in pixels when there is no saved drawing. (default: 1024) | INT | Yes | 64 to 8192 (step 8) |
+| `height` | Canvas height in pixels when there is no saved drawing. (default: 1024) | INT | Yes | 64 to 8192 (step 8) |
+| `background` | Canvas background colour, with transparent mode also premultiplying the saved drawing's RGB by its alpha. (default: `white`) | COMBO | Yes | `"white"`<br>`"black"`<br>`"transparent"` |
+| `image` | Path under ComfyUI's input folder written by the drawing editor when it saves the rendered canvas. | STRING | Yes |  |
+| `drawing_state` | Serialized editable canvas state written by the drawing editor to restore the drawing in the workflow. | STRING | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `image` | The input image. | IMAGE |
-| `mask` | The mask. | MASK |
+| `image` | RGB pixels of the saved drawing or of a blank canvas at the requested dimensions. | IMAGE |
+| `mask` | Inverse alpha of the drawing, with white marking transparent pixels. | MASK |
 
 Notes:
 

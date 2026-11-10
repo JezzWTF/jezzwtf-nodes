@@ -45,7 +45,7 @@ class VideoCompare(io.ComfyNode):
                 io.Float.Input("b_offset", default=0.0, min=-1000.0, max=1000.0, step=0.001, optional=True, tooltip="Seconds to shift B against A: B plays at A's time + offset (positive skips into B, negative delays it)."),
                 io.Audio.Input("audio_a", optional=True, tooltip='Audio mixed into the preview when A is built from IMAGE frames. Ignored while video_a is connected.'),
                 io.Audio.Input("audio_b", optional=True, tooltip='Audio mixed into the preview when B is built from IMAGE frames. Ignored while video_b is connected.'),
-                io.String.Input("filename_prefix", default='videoCompare', optional=True),
+                io.String.Input("filename_prefix", default='videoCompare', optional=True, tooltip="Filename prefix and optional subfolder for the two preview MP4s written to ComfyUI's temp directory."),
             ],
             outputs=[],
             is_output_node=True,

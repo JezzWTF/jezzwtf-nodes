@@ -14,7 +14,7 @@ Synchronized A/B comparison of two videos in the UI. Play both side-by-side, wip
 | `b_offset` | Seconds to shift B against A: B plays at A's time + offset (positive skips into B, negative delays it). (default: 0.0) | FLOAT | No | -1000 to 1000 (step 0.001) |
 | `audio_a` | Audio mixed into the preview when A is built from IMAGE frames. Ignored while video_a is connected. | AUDIO | No |  |
 | `audio_b` | Audio mixed into the preview when B is built from IMAGE frames. Ignored while video_b is connected. | AUDIO | No |  |
-| `filename_prefix` | Prefix for the saved file; a sub-folder can be included, for example `gifs/clip`. (default: videoCompare) | STRING | No |  |
+| `filename_prefix` | Filename prefix and optional subfolder for the two preview MP4s written to ComfyUI's temp directory. (default: videoCompare) | STRING | No |  |
 
 Notes:
 

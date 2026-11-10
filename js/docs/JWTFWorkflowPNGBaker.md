@@ -6,15 +6,15 @@ Embed a workflow or prompt into a PNG.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `image` | The input image. | IMAGE | Yes |  |
-| `json_text` | Json text. | STRING | Yes |  |
-| `filename_prefix` | Prefix for the saved file; a sub-folder can be included, for example `gifs/clip`. (default: Workflow_PNG/workflow) | STRING | Yes |  |
+| `image` | Images to save as PNGs with the supplied workflow metadata embedded in each one. | IMAGE | Yes |  |
+| `json_text` | ComfyUI workflow JSON, API prompt JSON or a wrapper containing one or both. | STRING | Yes |  |
+| `filename_prefix` | Relative subfolder and filename prefix under ComfyUI's output directory. (default: Workflow_PNG/workflow) | STRING | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `saved_path` | Saved path. | STRING |
+| `saved_path` | Paths to all saved workflow PNGs, one per line. | STRING |
 
 Notes:
 

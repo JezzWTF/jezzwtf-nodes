@@ -6,18 +6,18 @@ Save a caption as a `.txt` named after the file just loaded.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `text` | Text. | STRING | Yes |  |
-| `image_path` | Image path. | STRING | Yes |  |
-| `save_location` | Save location. | COMBO | Yes | `"next to image"`<br>`"custom folder"` |
-| `custom_folder` | Custom folder. | STRING | Yes |  |
-| `extension` | Extension. (default: txt) | STRING | Yes |  |
-| `overwrite` | Overwrite. (default: true) | BOOLEAN | Yes |  |
+| `text` | Caption written as UTF-8 after trimming surrounding whitespace and normalising line endings. | STRING | Yes |  |
+| `image_path` | Source file path whose basename is used to name the caption. | STRING | Yes |  |
+| `save_location` | Chooses whether to write beside the source file or in a separate directory. | COMBO | Yes | `"next to image"`<br>`"custom folder"` |
+| `custom_folder` | Destination directory used when custom folder is selected. | STRING | Yes |  |
+| `extension` | Filename extension for the caption, defaulting to txt. (default: txt) | STRING | Yes |  |
+| `overwrite` | Allows replacing an existing caption at the destination, with the file skipped when disabled. (default: true) | BOOLEAN | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `saved_path` | Saved path. | STRING |
+| `saved_path` | Resolved destination path, including when an existing caption was skipped. | STRING |
 
 Notes:
 

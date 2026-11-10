@@ -114,8 +114,8 @@ class JWTFTimer(io.ComfyNode):
             display_name='Batch Timer',
             category='JezzWTF/utils',
             inputs=[
-                io.Int.Input("total_images", default=1, min=1, max=999999),
-                io.AnyType.Input("trigger", optional=True),
+                io.Int.Input("total_images", default=1, min=1, max=999999, tooltip="Number of images expected in the run, used as the target for the progress counter."),
+                io.AnyType.Input("trigger", optional=True, tooltip="Optional upstream connection that makes the timer tick after the connected work completes."),
             ],
             outputs=[],
             hidden=[io.Hidden.unique_id],

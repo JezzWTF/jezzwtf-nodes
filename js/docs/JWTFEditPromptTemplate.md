@@ -6,16 +6,16 @@ Edit instruction plus optional suffix and separator.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `edit_instruction` | Edit instruction. (default: Change the [subject] into [new subject].) | STRING | Yes |  |
-| `enable_suffix` | Enable suffix. (default: true) | BOOLEAN | No |  |
-| `suffix` | Suffix. | STRING | No |  |
-| `separator` | Separator. (default: `newline`) | COMBO | No | `"newline"`<br>`"space"`<br>`"comma"` |
+| `edit_instruction` | Instruction describing the edit to request from the model. (default: Change the [subject] into [new subject].) | STRING | Yes |  |
+| `enable_suffix` | Appends the preservation instruction when it contains text. (default: true) | BOOLEAN | No |  |
+| `suffix` | Text appended to the edit instruction when enabled, defaulting to a request to preserve the rest of the image. | STRING | No |  |
+| `separator` | Characters inserted between the edit instruction and the enabled suffix. (default: `newline`) | COMBO | No | `"newline"`<br>`"space"`<br>`"comma"` |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `prompt` | The text prompt. | STRING |
+| `prompt` | Combined prompt with surrounding whitespace trimmed. | STRING |
 
 Notes:
 

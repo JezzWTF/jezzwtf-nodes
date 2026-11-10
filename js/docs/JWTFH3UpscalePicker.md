@@ -6,22 +6,22 @@ Same-scale target size on a 16-px grid for the MiniMax H3 latent upscaler.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `width` | Width in pixels. (default: 640) | INT | Yes | 1 to 16384 |
-| `height` | Height in pixels. (default: 352) | INT | Yes | 1 to 16384 |
-| `mode` | Mode. (default: `Scale factor`) | COMBO | Yes | `"Scale factor"`<br>`"Target megapixels"` |
-| `scale` | Scale. (default: `2x`) | COMBO | Yes | choose from the list |
-| `custom_scale` | Custom scale. (default: 2.0) | FLOAT | Yes | 1 to 4 (step 0.01) |
-| `target_megapixels` | Target megapixels. (default: 0.5) | FLOAT | Yes | 0.05 to 16 (step 0.05) |
-| `multiple` | Multiple. (default: 16) | INT | Yes | 16 to 256 (step 16) |
+| `width` | Source width in pixels. (default: 640) | INT | Yes | 1 to 16384 |
+| `height` | Source height in pixels. (default: 352) | INT | Yes | 1 to 16384 |
+| `mode` | Chooses whether to calculate output dimensions from a scale factor or a target pixel area. (default: `Scale factor`) | COMBO | Yes | `"Scale factor"`<br>`"Target megapixels"` |
+| `scale` | Preset upscale factor, with Custom using the numeric scale. (default: `2x`) | COMBO | Yes | choose from the list |
+| `custom_scale` | Upscale factor used when the scale choice is Custom. (default: 2.0) | FLOAT | Yes | 1 to 4 (step 0.01) |
+| `target_megapixels` | Target image area in units of 1,048,576 pixels, with the requested scale clamped between 1x and 4x. (default: 0.5) | FLOAT | Yes | 0.05 to 16 (step 0.05) |
+| `multiple` | Output pixel grid size, rounded up to a multiple of 16. (default: 16) | INT | Yes | 16 to 256 (step 16) |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `width` | Width in pixels. | INT |
-| `height` | Height in pixels. | INT |
-| `scale` | Scale. | FLOAT |
-| `info` | Info. | STRING |
+| `width` | Selected output width in pixels on the requested grid. | INT |
+| `height` | Selected output height in pixels on the requested grid. | INT |
+| `scale` | Mean of the horizontal and vertical scale factors after choosing the output dimensions. | FLOAT |
+| `info` | Summary of the chosen dimensions, per-axis scales, pixel area and any scale clamping. | STRING |
 
 Notes:
 

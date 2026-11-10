@@ -6,42 +6,42 @@ Diffusion model, attention backend, block-sparse attention, two text encoders an
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `model_name` | Model name. | COMBO | Yes | choose from the list |
-| `quant_format` | Quant format. (default: `auto`) | COMBO | Yes | `"auto"`<br>`"bf16"`<br>`"asym_w4a8_int8"`<br>`"convrot_w4a4"`<br>`"float8_e4m3fn"`<br>`"float8_e5m2"`<br>`"int8_tensorwise"`<br>`"mxfp8"`<br>`"nvfp4"`<br>`"w6a8_int8"` |
-| `model_type` | Model type. (default: `default`) | COMBO | Yes | `"default"`<br>`"minimax_h3"`<br>`"flux3"`<br>`"moss"` |
-| `kitchen` | Kitchen. (default: true) | BOOLEAN | Yes |  |
-| `sage2` | Sage2. (default: false) | BOOLEAN | Yes |  |
-| `sage3` | Sage3. (default: false) | BOOLEAN | Yes |  |
-| `triton` | Triton. (default: false) | BOOLEAN | Yes |  |
-| `flash2` | Flash2. (default: false) | BOOLEAN | Yes |  |
-| `pytorch` | Pytorch. (default: false) | BOOLEAN | Yes |  |
-| `sparse` | Sparse. (default: false) | BOOLEAN | Yes |  |
-| `vsa` | Vsa. (default: false) | BOOLEAN | Yes |  |
-| `clip1_name` | Clip1 name. | COMBO | Yes | choose from the list |
-| `clip1_type` | Clip1 type. (default: `auto`) | COMBO | Yes | choose from the list |
-| `clip1_device` | Clip1 device. (default: `default`) | COMBO | Yes | `"default"`<br>`"cpu"` |
-| `clip2_enabled` | Clip2 enabled. (default: false) | BOOLEAN | Yes |  |
-| `clip2_name` | Clip2 name. | COMBO | Yes | choose from the list |
-| `clip2_type` | Clip2 type. (default: `auto`) | COMBO | Yes | choose from the list |
-| `clip2_device` | Clip2 device. (default: `default`) | COMBO | Yes | `"default"`<br>`"cpu"` |
-| `vae_name` | Vae name. | COMBO | Yes | choose from the list |
-| `audio_vae_enabled` | Audio vae enabled. (default: false) | BOOLEAN | Yes |  |
-| `audio_vae_name` | Audio vae name. | COMBO | Yes | choose from the list |
-| `heading_model` | Heading model. (default: Model) | STRING | Yes |  |
-| `heading_engine` | Heading engine. (default: Efficiencies) | STRING | Yes |  |
-| `heading_clips` | Heading clips. (default: Text Encoders) | STRING | Yes |  |
-| `heading_vaes` | Heading vaes. (default: VAEs) | STRING | Yes |  |
-| `section_order` | Section order. (default: model,engine,clips,vaes) | STRING | Yes |  |
+| `model_name` | Diffusion weights to load from ComfyUI's configured diffusion model folders. | COMBO | Yes | choose from the list |
+| `quant_format` | Expected weight quantisation for diagnostics, with auto reporting the metadata detected in the loaded model. (default: `auto`) | COMBO | Yes | `"auto"`<br>`"bf16"`<br>`"float8_e4m3fn"`<br>`"float8_e5m2"`<br>`"mxfp8"`<br>`"nvfp4"` |
+| `model_type` | Model family hint used for automatic text encoder selection and sparse attention diagnostics. (default: `default`) | COMBO | Yes | `"default"`<br>`"minimax_h3"`<br>`"flux3"`<br>`"moss"` |
+| `kitchen` | Allows the registered Comfy Kitchen INT8 attention backend to be selected. (default: true) | BOOLEAN | Yes |  |
+| `sage2` | Allows the registered SageAttention 2 backend to be selected. (default: false) | BOOLEAN | Yes |  |
+| `sage3` | Allows the registered SageAttention 3 backend to be selected with highest priority. (default: false) | BOOLEAN | Yes |  |
+| `triton` | Sets the Triton backend flag, which only takes effect if ComfyUI has enabled the backend at startup. (default: false) | BOOLEAN | Yes |  |
+| `flash2` | Allows the registered FlashAttention 2 backend to be selected. (default: false) | BOOLEAN | Yes |  |
+| `pytorch` | Allows registered PyTorch attention as the last fallback among enabled backends. (default: false) | BOOLEAN | Yes |  |
+| `sparse` | Enables block-sparse attention on supported builds, mutually exclusive with VSA. (default: false) | BOOLEAN | Yes |  |
+| `vsa` | Enables video sparse attention on MiniMax H3, mutually exclusive with block-sparse attention. (default: false) | BOOLEAN | Yes |  |
+| `clip1_name` | Weights file for the primary text encoder. | COMBO | Yes | choose from the list |
+| `clip1_type` | Primary text encoder architecture, with auto using the model family hint. (default: `auto`) | COMBO | Yes | choose from the list |
+| `clip1_device` | Device placement for the primary text encoder, with default using ComfyUI's normal placement. (default: `default`) | COMBO | Yes | `"default"`<br>`"cpu"` |
+| `clip2_enabled` | Loads a separate second text encoder when enabled. (default: false) | BOOLEAN | Yes |  |
+| `clip2_name` | Weights file for the optional second text encoder. | COMBO | Yes | choose from the list |
+| `clip2_type` | Second text encoder architecture, with auto using the model family hint. (default: `auto`) | COMBO | Yes | choose from the list |
+| `clip2_device` | Device placement for the second text encoder, with default using ComfyUI's normal placement. (default: `default`) | COMBO | Yes | `"default"`<br>`"cpu"` |
+| `vae_name` | Weights file for the primary image or video VAE. | COMBO | Yes | choose from the list |
+| `audio_vae_enabled` | Loads a separate audio VAE when enabled. (default: false) | BOOLEAN | Yes |  |
+| `audio_vae_name` | Weights file for the optional audio VAE. | COMBO | Yes | choose from the list |
+| `heading_model` | Editable label for the model section, saved by the loader panel. (default: Model) | STRING | Yes |  |
+| `heading_engine` | Editable label for the efficiency settings section, saved by the loader panel. (default: Efficiencies) | STRING | Yes |  |
+| `heading_clips` | Editable label for the text encoder section, saved by the loader panel. (default: Text Encoders) | STRING | Yes |  |
+| `heading_vaes` | Editable label for the VAE section, saved by the loader panel. (default: VAEs) | STRING | Yes |  |
+| `section_order` | Comma-separated section IDs written by the loader panel when sections are reordered. (default: model,engine,clips,vaes) | STRING | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `MODEL` | Model. | MODEL |
-| `CLIP (main)` | Clip (main). | CLIP |
-| `CLIP (enhancer)` | Clip (enhancer). | CLIP |
-| `VAE (video/default)` | Vae (video/default). | VAE |
-| `VAE (audio)` | Vae (audio). | VAE |
+| `MODEL` | Loaded diffusion model with any selected attention patches. | MODEL |
+| `CLIP (main)` | Primary text encoder loaded for conditioning. | CLIP |
+| `CLIP (enhancer)` | Second text encoder for optional prompt enhancement, or empty when disabled. | CLIP |
+| `VAE (video/default)` | Primary image or video VAE. | VAE |
+| `VAE (audio)` | Separate audio VAE, or empty when disabled. | VAE |
 
 Notes:
 

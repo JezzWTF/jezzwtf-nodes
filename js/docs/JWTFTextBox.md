@@ -6,13 +6,13 @@ Reusable prompt card with live counts, copy and clear.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `text` | Text. | STRING | Yes |  |
+| `text` | Multiline text to send unchanged to downstream nodes. | STRING | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `TEXT` | Text. | STRING |
+| `TEXT` | Text exactly as entered in the widget. | STRING |
 
 Notes:
 

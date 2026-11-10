@@ -98,7 +98,9 @@ def test_node_shape_and_tick(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(timer, "send_sync", lambda event, data: sent.append((event, data)))
     monkeypatch.setattr(timer, "RUNS", TimerRuns())
     spec = JWTFTimer.INPUT_TYPES()
-    assert spec["required"]["total_images"][1] == {"default": 1, "min": 1, "max": 999999}
+    total_images = dict(spec["required"]["total_images"][1])
+    assert total_images.pop("tooltip")
+    assert total_images == {"default": 1, "min": 1, "max": 999999}
     assert "trigger" in spec["optional"] and spec["hidden"]["unique_id"] == ("UNIQUE_ID",)
     assert JWTFTimer.OUTPUT_NODE and not JWTFTimer.RETURN_TYPES
     assert math.isnan(JWTFTimer.fingerprint_inputs())

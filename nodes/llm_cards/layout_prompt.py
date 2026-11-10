@@ -75,15 +75,15 @@ class JWTFLayoutLLMPrompt(io.ComfyNode):
             display_name='Layout LLM Prompt',
             category='JezzWTF/LLM',
             inputs=[
-                io.String.Input("scene", default='A retro travel poster for a seaside town: a red lighthouse on a cliff at the right, a small sailboat on the sea at the lower left, and the title "VISIT PORT HAVEN" in bold cream letters across the top.', multiline=True),
-                io.Int.Input("width", default=1024, min=16, max=16384, step=16),
-                io.Int.Input("height", default=1024, min=16, max=16384, step=16),
-                io.Int.Input("max_boxes", default=5, min=1, max=16),
-                io.String.Input("extra_rules", default='', multiline=True, optional=True),
+                io.String.Input("scene", default='A retro travel poster for a seaside town: a red lighthouse on a cliff at the right, a small sailboat on the sea at the lower left, and the title "VISIT PORT HAVEN" in bold cream letters across the top.', multiline=True, tooltip="Scene description passed to the language model as the layout request."),
+                io.Int.Input("width", default=1024, min=16, max=16384, step=16, tooltip="Target canvas width in pixels included in the layout instructions."),
+                io.Int.Input("height", default=1024, min=16, max=16384, step=16, tooltip="Target canvas height in pixels included in the layout instructions."),
+                io.Int.Input("max_boxes", default=5, min=1, max=16, tooltip="Maximum number of boxes requested in the generated layout."),
+                io.String.Input("extra_rules", default='', multiline=True, optional=True, tooltip="Optional instructions appended to the generated system prompt."),
             ],
             outputs=[
-                io.String.Output("system_prompt"),
-                io.String.Output("prompt"),
+                io.String.Output("system_prompt", tooltip="System instructions defining the canvas, box limit and required layout JSON format."),
+                io.String.Output("prompt", tooltip="User prompt asking the model to lay out the supplied scene."),
             ],
         )
 

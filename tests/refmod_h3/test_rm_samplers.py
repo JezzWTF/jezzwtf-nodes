@@ -112,7 +112,9 @@ def test_ultimate_interface() -> None:
                                       "sampler_mode", "bongmath", "decode", "tiled_decode", "preview_fps"]
     req = spec["required"]
     assert req["steps"][1]["default"] == 30 and req["cfg"][1]["default"] == 5.5 and req["cfg"][1]["round"] is False
-    assert req["eta"][1] == {"default": 0.5, "min": -100.0, "max": 100.0, "step": 0.01}
+    eta = dict(req["eta"][1])
+    assert eta.pop("tooltip")
+    assert eta == {"default": 0.5, "min": -100.0, "max": 100.0, "step": 0.01}
     assert req["sampler_mode"][0] == ["standard", "unsample", "resample"] and req["bongmath"][1]["default"] is True
     assert {"negative", "vae", "audio_vae", "sigmas", "options", "preview", "preview_max_res", "preview_frames",
             "preview_jpeg_quality", "preview_tiny_vae"} <= set(spec["optional"])

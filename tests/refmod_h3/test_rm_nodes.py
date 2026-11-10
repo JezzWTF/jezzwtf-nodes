@@ -159,7 +159,9 @@ def test_bake_is_changed_only_depends_on_the_folder(tmp_path: Path) -> None:
 def test_node_interfaces_match_spec() -> None:
     bake = legacy_spec(h3_nodes.JWTFRefModBake)
     assert list(bake["required"]) == ["name", "vae"]
-    assert bake["optional"]["audio_max_seconds"][1] == {"default": 30.0, "min": 0.025, "max": 600.0, "step": 0.5}
+    audio_max_seconds = dict(bake["optional"]["audio_max_seconds"][1])
+    assert audio_max_seconds.pop("tooltip")
+    assert audio_max_seconds == {"default": 30.0, "min": 0.025, "max": 600.0, "step": 0.5}
     assert bake["optional"]["max_visual_tokens"][1]["step"] == 512 and bake["optional"]["overwrite"][1]["default"] is True
     assert tuple(h3_nodes.JWTFRefModBake.RETURN_NAMES) == ("mods", "saved_path", "details")
     assert h3_nodes.JWTFRefModBake.OUTPUT_NODE is True

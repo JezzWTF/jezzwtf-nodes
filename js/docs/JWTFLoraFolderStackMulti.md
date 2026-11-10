@@ -6,26 +6,26 @@ Folder LoRA stack applied to up to five models (CLIP only on the first).
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `model` | The model to use. | MODEL | Yes |  |
+| `model` | First diffusion model to patch with the stack. | MODEL | Yes |  |
 | `folder` | Subfolder of models/loras (blank = the root folder itself). | STRING | Yes |  |
-| `lora_data` | Lora data. (default: {}) | STRING | Yes |  |
-| `clip` | The CLIP / text encoder to use. | CLIP | No |  |
-| `model_2` | Model 2. | MODEL | No |  |
-| `model_3` | Model 3. | MODEL | No |  |
-| `model_4` | Model 4. | MODEL | No |  |
-| `model_5` | Model 5. | MODEL | No |  |
+| `lora_data` | JSON list of LoRA selections, enable flags and strengths written by the stack editor. (default: {}) | STRING | Yes |  |
+| `clip` | Optional text encoder patched alongside the first diffusion model. | CLIP | No |  |
+| `model_2` | Second model to patch with the same stack. | MODEL | No |  |
+| `model_3` | Third model to patch with the same stack. | MODEL | No |  |
+| `model_4` | Fourth model to patch with the same stack. | MODEL | No |  |
+| `model_5` | Fifth model to patch with the same stack. | MODEL | No |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `MODEL` | Model. | MODEL |
-| `CLIP` | Clip. | CLIP |
-| `applied` | Applied. | STRING |
-| `MODEL 2` | Model 2. | MODEL |
-| `MODEL 3` | Model 3. | MODEL |
-| `MODEL 4` | Model 4. | MODEL |
-| `MODEL 5` | Model 5. | MODEL |
+| `MODEL` | First model with the enabled LoRAs applied in stack order. | MODEL |
+| `CLIP` | Text encoder patched alongside the first model, or empty when no encoder was connected. | CLIP |
+| `applied` | Summary of the LoRAs applied to the first model, including their strengths. | STRING |
+| `MODEL 2` | Patched second model, or empty when its input is disconnected. | MODEL |
+| `MODEL 3` | Patched third model, or empty when its input is disconnected. | MODEL |
+| `MODEL 4` | Patched fourth model, or empty when its input is disconnected. | MODEL |
+| `MODEL 5` | Patched fifth model, or empty when its input is disconnected. | MODEL |
 
 Notes:
 

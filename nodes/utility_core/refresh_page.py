@@ -165,14 +165,14 @@ class JWTFRefreshPage(io.ComfyNode):
             display_name='Refresh Page (VRAM Cleaner)',
             category='JezzWTF/utils',
             inputs=[
-                io.Boolean.Input("clean_vram", default=True),
-                io.Boolean.Input("clear_cache", default=True),
-                io.Boolean.Input("clear_node_cache", default=False),
-                io.Combo.Input("kitchen_backend", options=list(KITCHEN_CHOICES), default='leave as is'),
-                io.AnyType.Input("anything", optional=True),
+                io.Boolean.Input("clean_vram", default=True, tooltip="Unloads models held by ComfyUI to release memory."),
+                io.Boolean.Input("clear_cache", default=True, tooltip="Asks ComfyUI to empty its device cache and runs Python garbage collection."),
+                io.Boolean.Input("clear_node_cache", default=False, tooltip="Requests a workflow execution cache reset through the ComfyUI queue when available."),
+                io.Combo.Input("kitchen_backend", options=list(KITCHEN_CHOICES), default='leave as is', tooltip="Changes the Comfy Kitchen backend preference, with leave as is preserving the current setting."),
+                io.AnyType.Input("anything", optional=True, tooltip="Optional upstream value to order cleanup after another node and pass its value through."),
             ],
             outputs=[
-                io.AnyType.Output("anything"),
+                io.AnyType.Output("anything", tooltip="Connected upstream value passed through unchanged after cleanup."),
             ],
             is_output_node=True,
         )

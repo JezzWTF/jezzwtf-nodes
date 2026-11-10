@@ -6,7 +6,7 @@ Aspect-aware size output for an image.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `image` | The input image. | IMAGE | Yes |  |
+| `image` | Image batch whose aspect ratio determines the calculated dimensions. | IMAGE | Yes |  |
 | `target_size` | Longest side in pixels. The other dimension is calculated to preserve aspect ratio, snapped to multiples of 8. (default: 1024) | INT | Yes | 64 to 8192 (step 8) |
 | `flip` | Swap width and height before scaling — useful for rotating orientation without changing the image. (default: false) | BOOLEAN | Yes |  |
 
@@ -14,9 +14,9 @@ Aspect-aware size output for an image.
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `IMAGE` | Image. | IMAGE |
-| `WIDTH` | Width. | INT |
-| `HEIGHT` | Height. | INT |
+| `IMAGE` | Original image batch passed through unchanged. | IMAGE |
+| `WIDTH` | Calculated width in pixels after scaling and snapping to a multiple of 8. | INT |
+| `HEIGHT` | Calculated height in pixels after scaling and snapping to a multiple of 8. | INT |
 
 Notes:
 

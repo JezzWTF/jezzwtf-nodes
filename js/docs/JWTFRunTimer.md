@@ -6,7 +6,7 @@ A display of the current and last run time. Every run is timed whether or not th
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `label` | Label the runs are filed under. | STRING | No |  |
+| `label` | Label under which this node files its runs, populated from the node title by the frontend. | STRING | No |  |
 
 Notes:
 

@@ -96,12 +96,12 @@ class JWTFSet(io.ComfyNode):
             display_name='Set (Remote)',
             category='JezzWTF/utils',
             inputs=[
-                io.String.Input("key", default='lora', multiline=False),
-                io.AnyType.Input("value"),
-                io.Combo.Input("color", options=['Default', 'Void', 'Neon', 'Plasma', 'Toxic', 'Flare', 'Blood', 'Quantum', 'Gold', 'Abyss', 'Ghost', 'Rose', 'Matrix', 'Nebula'], default='Default'),
+                io.String.Input("key", default='lora', multiline=False, tooltip="Name under which the value is stored and matched by Get nodes."),
+                io.AnyType.Input("value", tooltip="Data from any socket type to store under the chosen key."),
+                io.Combo.Input("color", options=['Default', 'Void', 'Neon', 'Plasma', 'Toxic', 'Flare', 'Blood', 'Quantum', 'Gold', 'Abyss', 'Ghost', 'Rose', 'Matrix', 'Nebula'], default='Default', tooltip="Canvas colour theme associated with the named value."),
             ],
             outputs=[
-                io.AnyType.Output("pass_through"),
+                io.AnyType.Output("pass_through", tooltip="The same value that was stored under the chosen key."),
             ],
             hidden=[io.Hidden.unique_id],
         )
@@ -121,11 +121,11 @@ class JWTFGet(io.ComfyNode):
             display_name='Get (Remote)',
             category='JezzWTF/utils',
             inputs=[
-                io.Combo.Input("key", options=['select a key...']),
-                io.AnyType.Input("set_link", optional=True, extra_dict={'forceInput': True}),
+                io.Combo.Input("key", options=['select a key...'], tooltip="Name of the Set node value to retrieve, populated by the frontend."),
+                io.AnyType.Input("set_link", optional=True, extra_dict={'forceInput': True}, tooltip="Optional link supplied by the frontend to use the matching Set node's current output directly."),
             ],
             outputs=[
-                io.AnyType.Output("value"),
+                io.AnyType.Output("value", tooltip="Value from the linked Set output or the named store entry when no link is present."),
             ],
         )
 

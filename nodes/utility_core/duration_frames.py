@@ -73,16 +73,16 @@ class JWTFDurationFrames(io.ComfyNode):
             display_name='Duration to Frames',
             category='JezzWTF/utils',
             inputs=[
-                io.Float.Input("duration", default=6.0, min=0.0, max=3600.0, step=0.1, round=0.001),
-                io.Combo.Input("preset", options=list(PRESET_NAMES), default='MiniMax H3 (24 FPS)'),
-                io.String.Input("expression", default='max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17', multiline=True),
-                io.Int.Input("fps", default=24, min=1, max=240),
+                io.Float.Input("duration", default=6.0, min=0.0, max=3600.0, step=0.1, round=0.001, tooltip="Requested clip length in seconds, available as a in the frame-count expression."),
+                io.Combo.Input("preset", options=list(PRESET_NAMES), default='MiniMax H3 (24 FPS)', tooltip="Selects a built-in frame rate and formula or uses the editable values in Custom mode."),
+                io.String.Input("expression", default='max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17', multiline=True, tooltip="Custom formula evaluated with a as seconds and fps as the frame rate, with the result rounded and clamped to at least one frame."),
+                io.Int.Input("fps", default=24, min=1, max=240, tooltip="Frame rate in frames per second used in Custom mode."),
             ],
             outputs=[
-                io.Int.Output("frames"),
-                io.Float.Output("seconds"),
-                io.Float.Output("fps"),
-                io.Int.Output("fps_int"),
+                io.Int.Output("frames", tooltip="Integer frame count calculated from the selected formula."),
+                io.Float.Output("seconds", tooltip="Actual duration in seconds after frame-count rounding, calculated as frames divided by the selected rate."),
+                io.Float.Output("fps", tooltip="Effective frames per second as a floating-point value."),
+                io.Int.Output("fps_int", tooltip="Effective frames per second as an integer."),
             ],
         )
 

@@ -6,28 +6,28 @@ Up to 16 image slots, each with its own output.
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `images_json` | Images json. (default: []) | STRING | Yes |  |
+| `images_json` | JSON array of filenames by slot, maintained by the node's image picker and uploader. (default: []) | STRING | Yes |  |
 
 ## Outputs
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `image_1` | Image 1. | IMAGE |
-| `image_2` | Image 2. | IMAGE |
-| `image_3` | Image 3. | IMAGE |
-| `image_4` | Image 4. | IMAGE |
-| `image_5` | Image 5. | IMAGE |
-| `image_6` | Image 6. | IMAGE |
-| `image_7` | Image 7. | IMAGE |
-| `image_8` | Image 8. | IMAGE |
-| `image_9` | Image 9. | IMAGE |
-| `image_10` | Image 10. | IMAGE |
-| `image_11` | Image 11. | IMAGE |
-| `image_12` | Image 12. | IMAGE |
-| `image_13` | Image 13. | IMAGE |
-| `image_14` | Image 14. | IMAGE |
-| `image_15` | Image 15. | IMAGE |
-| `image_16` | Image 16. | IMAGE |
+| `image_1` | RGB image from slot 1, with a placeholder when the slot is empty. | IMAGE |
+| `image_2` | RGB image from slot 2, with a placeholder when the slot is empty. | IMAGE |
+| `image_3` | RGB image from slot 3, with a placeholder when the slot is empty. | IMAGE |
+| `image_4` | RGB image from slot 4, with a placeholder when the slot is empty. | IMAGE |
+| `image_5` | RGB image from slot 5, with a placeholder when the slot is empty. | IMAGE |
+| `image_6` | RGB image from slot 6, with a placeholder when the slot is empty. | IMAGE |
+| `image_7` | RGB image from slot 7, with a placeholder when the slot is empty. | IMAGE |
+| `image_8` | RGB image from slot 8, with a placeholder when the slot is empty. | IMAGE |
+| `image_9` | RGB image from slot 9, with a placeholder when the slot is empty. | IMAGE |
+| `image_10` | RGB image from slot 10, with a placeholder when the slot is empty. | IMAGE |
+| `image_11` | RGB image from slot 11, with a placeholder when the slot is empty. | IMAGE |
+| `image_12` | RGB image from slot 12, with a placeholder when the slot is empty. | IMAGE |
+| `image_13` | RGB image from slot 13, with a placeholder when the slot is empty. | IMAGE |
+| `image_14` | RGB image from slot 14, with a placeholder when the slot is empty. | IMAGE |
+| `image_15` | RGB image from slot 15, with a placeholder when the slot is empty. | IMAGE |
+| `image_16` | RGB image from slot 16, with a placeholder when the slot is empty. | IMAGE |
 
 Notes:
 

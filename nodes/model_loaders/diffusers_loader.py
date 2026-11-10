@@ -116,14 +116,14 @@ class JWTFDiffusersLoader(io.ComfyNode):
             category='JezzWTF/loaders',
             description='Load a Diffusers-layout folder or a single diffusion-model file, with an optional attention backend.',
             inputs=[
-                io.Combo.Input("model_name", options=list_models()),
-                io.Combo.Input("sageattention_version", options=SAGE_CHOICES, default='None'),
-                io.Combo.Input("flashattention_version", options=FLASH_CHOICES, default='None'),
+                io.Combo.Input("model_name", options=list_models(), tooltip="Diffusers directory or standalone diffusion weights file selected from the configured model folders."),
+                io.Combo.Input("sageattention_version", options=SAGE_CHOICES, default='None', tooltip="Optional SageAttention backend, used if available and no FlashAttention version takes precedence."),
+                io.Combo.Input("flashattention_version", options=FLASH_CHOICES, default='None', tooltip="Optional FlashAttention backend, with masked attention calls falling back to the default backend."),
             ],
             outputs=[
-                io.Model.Output("MODEL"),
-                io.Clip.Output("CLIP"),
-                io.Vae.Output("VAE"),
+                io.Model.Output("MODEL", tooltip="Loaded diffusion model with the requested attention backend when available."),
+                io.Clip.Output("CLIP", tooltip="Text encoder loaded from the selected Diffusers directory when present."),
+                io.Vae.Output("VAE", tooltip="VAE loaded from the selected Diffusers directory when present."),
             ],
         )
 

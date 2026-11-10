@@ -63,10 +63,10 @@ class JWTFGalleryLoad(io.ComfyNode):
                 io.String.Input("selection", default="[]", tooltip="The picked images as a JSON list; the Gallery window writes this."),
             ],
             outputs=[
-                io.Image.Output("images"),
-                io.Mask.Output("masks"),
-                io.String.Output("names"),
-                io.Int.Output("count"),
+                io.Image.Output("images", tooltip="Selected images as an RGB batch, with later images resized to the first image's dimensions."),
+                io.Mask.Output("masks", tooltip="Inverse-alpha masks at the batch dimensions, with zeros for images without transparency."),
+                io.String.Output("names", tooltip="Gallery file labels in selection order, one per line."),
+                io.Int.Output("count", tooltip="Number of images in the returned batch."),
             ],
         )
 

@@ -25,7 +25,7 @@ class JWTFRunTimer(io.ComfyNode):
             category='JezzWTF/utils',
             description="A display of the current and last run time. Every run is timed whether or not this node is on the canvas; renaming it labels its runs.",
             inputs=[
-                io.String.Input("label", default='', multiline=False, optional=True),
+                io.String.Input("label", default='', multiline=False, optional=True, tooltip="Label under which this node files its runs, populated from the node title by the frontend."),
             ],
             is_output_node=True,
         )

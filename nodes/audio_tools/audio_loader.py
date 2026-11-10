@@ -52,17 +52,17 @@ class JWTFAudioLoader(io.ComfyNode):
             category="JezzWTF/audio",
             description="Load an audio file from the input folder (subfolders included) with optional start, length and mono mix.",
             inputs=[
-                io.Combo.Input("audio", options=paths.list_audio() or [NO_AUDIO]),  # upload and preview are added by js/audio_tools
+                io.Combo.Input("audio", options=paths.list_audio() or [NO_AUDIO], tooltip="Audio file selected from ComfyUI's input folder, including subfolders, unless an explicit path overrides it."),  # upload and preview are added by js/audio_tools
                 io.Float.Input("start", default=0.0, min=0.0, max=MAX_SECONDS, step=0.01, optional=True, tooltip="Seconds to skip from the start."),
                 io.Float.Input("length", default=0.0, min=0.0, max=MAX_SECONDS, step=0.01, optional=True, tooltip="Seconds to keep; 0 = the rest of the file."),
                 io.Boolean.Input("mono", default=False, optional=True, tooltip="Mix all channels down to one."),
                 io.String.Input("path", default="", optional=True, tooltip="Optional file path (input, output or temp folder). Overrides the picker."),
             ],
             outputs=[
-                io.Audio.Output("audio"),
-                io.Float.Output("duration"),
-                io.Int.Output("sample_rate"),
-                io.String.Output("file_path"),
+                io.Audio.Output("audio", tooltip="Decoded audio after trimming and any mono mixdown."),
+                io.Float.Output("duration", tooltip="Length of the returned audio in seconds after trimming."),
+                io.Int.Output("sample_rate", tooltip="Sample rate of the returned waveform in samples per second."),
+                io.String.Output("file_path", tooltip="Resolved path to the original audio file, suitable for passing to Album Cover."),
             ],
         )
 

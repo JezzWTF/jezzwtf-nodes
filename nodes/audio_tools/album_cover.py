@@ -100,15 +100,15 @@ class JWTFAlbumCover(io.ComfyNode):
             inputs=[
                 io.Image.Input("image", tooltip="The first frame of the batch (or the chosen index) becomes the cover."),
                 io.String.Input("audio_path", default="", tooltip="An audio file in the input, output or temp folder, e.g. from Audio Loader."),
-                io.Combo.Input("save_mode", options=[SAVE_COPY, REPLACE], default=SAVE_COPY),
+                io.Combo.Input("save_mode", options=[SAVE_COPY, REPLACE], default=SAVE_COPY, tooltip="Saves a separate copy in output or replaces the original file, with replacement unavailable for temp files."),
                 io.String.Input("filename_prefix", default="covers", optional=True, tooltip="Sub-folder of output for the copy."),
                 io.Int.Input("cover_size", default=1000, min=0, max=4096, step=10, optional=True, tooltip="Longest edge in pixels; 0 keeps the image size."),
-                io.Int.Input("image_index", default=0, min=0, max=4096, optional=True),
-                io.String.Input("title", default="", optional=True),
-                io.String.Input("artist", default="", optional=True),
-                io.String.Input("album", default="", optional=True),
+                io.Int.Input("image_index", default=0, min=0, max=4096, optional=True, tooltip="Zero-based frame to use from the batch, clamped to the last frame if the index is too large."),
+                io.String.Input("title", default="", optional=True, tooltip="Optional title tag, with blank preserving the existing metadata."),
+                io.String.Input("artist", default="", optional=True, tooltip="Optional artist tag, with blank preserving the existing metadata."),
+                io.String.Input("album", default="", optional=True, tooltip="Optional album tag, with blank preserving the existing metadata."),
             ],
-            outputs=[io.String.Output("file_path")],
+            outputs=[io.String.Output("file_path", tooltip="Full path to the audio file containing the embedded cover.")],
             is_output_node=True,
         )
 

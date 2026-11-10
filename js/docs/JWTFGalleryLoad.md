@@ -12,10 +12,10 @@ Pick images in a floating gallery window (input or output folders, with folders 
 
 | Output Name | Description | Data Type |
 |-------------|-------------|-----------|
-| `images` | The input images (an image batch). | IMAGE |
-| `masks` | Masks. | MASK |
-| `names` | Names. | STRING |
-| `count` | Count. | INT |
+| `images` | Selected images as an RGB batch, with later images resized to the first image's dimensions. | IMAGE |
+| `masks` | Inverse-alpha masks at the batch dimensions, with zeros for images without transparency. | MASK |
+| `names` | Gallery file labels in selection order, one per line. | STRING |
+| `count` | Number of images in the returned batch. | INT |
 
 Notes:
 

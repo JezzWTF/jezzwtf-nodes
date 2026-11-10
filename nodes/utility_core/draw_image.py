@@ -55,15 +55,15 @@ class JWTFDrawImage(io.ComfyNode):
             display_name='Draw Image',
             category='JezzWTF/image',
             inputs=[
-                io.Int.Input("width", default=1024, min=64, max=8192, step=8),
-                io.Int.Input("height", default=1024, min=64, max=8192, step=8),
-                io.Combo.Input("background", options=list(BACKGROUNDS), default='white'),
-                io.String.Input("image", default=''),
-                io.String.Input("drawing_state", default=''),
+                io.Int.Input("width", default=1024, min=64, max=8192, step=8, tooltip="Canvas width in pixels when there is no saved drawing."),
+                io.Int.Input("height", default=1024, min=64, max=8192, step=8, tooltip="Canvas height in pixels when there is no saved drawing."),
+                io.Combo.Input("background", options=list(BACKGROUNDS), default='white', tooltip="Canvas background colour, with transparent mode also premultiplying the saved drawing's RGB by its alpha."),
+                io.String.Input("image", default='', tooltip="Path under ComfyUI's input folder written by the drawing editor when it saves the rendered canvas."),
+                io.String.Input("drawing_state", default='', tooltip="Serialized editable canvas state written by the drawing editor to restore the drawing in the workflow."),
             ],
             outputs=[
-                io.Image.Output("image"),
-                io.Mask.Output("mask"),
+                io.Image.Output("image", tooltip="RGB pixels of the saved drawing or of a blank canvas at the requested dimensions."),
+                io.Mask.Output("mask", tooltip="Inverse alpha of the drawing, with white marking transparent pixels."),
             ],
         )
 

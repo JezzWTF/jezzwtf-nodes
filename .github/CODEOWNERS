@@ -1,0 +1,5 @@
+# Everything needs a review from the maintainer. With "Require review from Code Owners" turned on for main,
+# this is what keeps the release workflow, the registry metadata and the nodes themselves from changing unreviewed.
+*                       @LyAhn
+/.github/               @LyAhn
+/pyproject.toml         @LyAhn

@@ -11,6 +11,7 @@ _log = logging.getLogger(__name__)
 _NODE_MODULES: tuple[str, ...] = (
     ".nodes.image_aspect_size",
     ".nodes.multi_switch",
+    ".nodes.switch",
     ".nodes.video_compare",
     ".nodes.utility_core",
     ".nodes.audio_tools",

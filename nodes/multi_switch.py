@@ -1,35 +1,44 @@
+"""Multi Switch: up to six independent true/false pairs behind one switch; output N is the chosen side of pair N."""
 from __future__ import annotations
 
 from comfy_api.latest import io
 
 MAX_SLOTS = 6
+SLOTS = range(1, MAX_SLOTS + 1)
+
+
+def chosen_side(switch: bool) -> str:
+    return "true" if switch else "false"
 
 
 class MultiSwitch(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
+        templates = {i: io.MatchType.Template(f"slot{i}") for i in SLOTS}
+        inputs: list[io.Input] = [
+            io.Boolean.Input("switch", default=False, label_on="true", label_off="false", tooltip="false passes every pair's false input through, true passes every pair's true input. Can also be wired in from another node."),
+        ]
+        for i in SLOTS:
+            inputs.append(io.MatchType.Input(f"false_{i}", template=templates[i], display_name="false", optional=True, lazy=True, tooltip=f"Pair {i}: passed to output {i} while the switch is false."))
+            inputs.append(io.MatchType.Input(f"true_{i}", template=templates[i], display_name="true", optional=True, lazy=True, tooltip=f"Pair {i}: passed to output {i} while the switch is true."))
         return io.Schema(
             node_id="MultiSwitch",
-            display_name='Multi Switch',
-            category='JezzWTF/utils',
-            inputs=[
-                io.Boolean.Input("switch", default=False, label_on='true', label_off='false', tooltip='Selects the true inputs when enabled and the false inputs when disabled, routing each slot to its corresponding output.'),
-            ],
-            accept_all_inputs=True,  # the front end adds true_N / false_N inputs on the fly
-            outputs=[
-                io.AnyType.Output("output_1", tooltip="Passes through true_1 when the switch is true or false_1 when it is false, returning no value if that input is disconnected."),
-                io.AnyType.Output("output_2", tooltip="Passes through true_2 when the switch is true or false_2 when it is false, returning no value if that input is disconnected."),
-                io.AnyType.Output("output_3", tooltip="Passes through true_3 when the switch is true or false_3 when it is false, returning no value if that input is disconnected."),
-                io.AnyType.Output("output_4", tooltip="Passes through true_4 when the switch is true or false_4 when it is false, returning no value if that input is disconnected."),
-                io.AnyType.Output("output_5", tooltip="Passes through true_5 when the switch is true or false_5 when it is false, returning no value if that input is disconnected."),
-                io.AnyType.Output("output_6", tooltip="Passes through true_6 when the switch is true or false_6 when it is false, returning no value if that input is disconnected."),
-            ],
+            display_name="Multi Switch",
+            category="JezzWTF/utils",
+            description="Switch several values at once: each true/false pair feeds its own output, and one switch flips them all. Only the chosen side of each pair is computed.",
+            inputs=inputs,
+            outputs=[io.MatchType.Output(template=templates[i], id=f"output_{i}", display_name=f"output {i}", tooltip=f"The chosen side of pair {i}; it has the type of what is connected.") for i in SLOTS],
         )
 
     @classmethod
-    def execute(cls, switch: bool, **kwargs: object) -> io.NodeOutput:
-        side = "true" if switch else "false"
-        return io.NodeOutput(*(kwargs.get(f"{side}_{i}") for i in range(1, MAX_SLOTS + 1)))
+    def check_lazy_status(cls, switch: bool = False, **inputs: object) -> list[str]:
+        side = chosen_side(switch)
+        return [f"{side}_{i}" for i in SLOTS if f"{side}_{i}" in inputs and inputs[f"{side}_{i}"] is None]
+
+    @classmethod
+    def execute(cls, switch: bool = False, **inputs: object) -> io.NodeOutput:
+        side = chosen_side(switch)
+        return io.NodeOutput(*(inputs.get(f"{side}_{i}") for i in SLOTS))
 
 
 NODES = [MultiSwitch]

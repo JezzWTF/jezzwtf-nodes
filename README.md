@@ -75,7 +75,9 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 | Multi Load Image | Up to 16 image slots, each with its own output |
 | Mask Composite | Combine two masks at an offset with replace, add, subtract, multiply, min, max, difference or xor, plus opacity, inversion and a soft edge |
 | Gallery Load | Pick one or many images in a floating gallery window (input or output folders, folders, search) and load them as a batch |
-| Multi Switch | Route several values by one switch |
+| Switch | Pick one of two inputs with a true/false switch; the output takes the connected type and only the chosen side is computed |
+| Route | Send one input to the true or the false output; nodes on the other output are skipped |
+| Multi Switch | Up to six true/false pairs behind one switch, each pair with its own typed output |
 | Folder Image Batch / Folder Video Batch | One file per run from a folder, with whole-folder auto-run |
 | Save Caption (Match Image) | Save a caption as a `.txt` named after the file just loaded |
 | Batch Timer | Counts finished items across queued prompts, with progress and ETA |

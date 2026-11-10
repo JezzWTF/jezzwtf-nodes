@@ -3,6 +3,7 @@
 // `buildCard` is passed in from run_timer.js; this file gives it a small stand-in for a graph node.
 
 const KEY = "jezzwtf.runTimer.floating";
+const MIN_WIDTH = 84; // small enough to sit in a corner as a plain clock
 const HOST_CARD_H = 127; // what a node's computeSize() reports; fixes the digital face at the same 2:1 shape as the node
 const MARGIN = 6;
 
@@ -40,6 +41,7 @@ export function createFloatingTimer(buildCard) {
   // The stand-in node: only what buildCard touches.
   const host = {
     title: "Run Timer",
+    minWidth: MIN_WIDTH,
     widgets: [],
     properties: { jwtf_style: saved.style },
     get size() { return this._size; },

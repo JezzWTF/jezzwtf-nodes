@@ -174,6 +174,7 @@ function buildCard(node) {
   const stats = el("div", "jwtf-rt-stats", "");
   const openBtn = el("button", "jwtf-rt-open", "history");
   openBtn.type = "button";
+  openBtn.title = "Run history";
   const foot = el("div", "jwtf-rt-foot");
   foot.append(stats, openBtn);
   const SVG = "http://www.w3.org/2000/svg";
@@ -183,31 +184,29 @@ function buildCard(node) {
     if (cls) n.setAttribute("class", cls);
     return n;
   };
-  const R = 45;
+  const R = 41; // radius of the ring's centre line; the glow needs the margin up to the card edge
+  const W = 4.2; // stroke width
   const CIRC = 2 * Math.PI * R;
   const ringSvg = svgEl("svg", { viewBox: "0 0 100 100" }, "jwtf-rt-ring");
-  const ringTrack = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": 5 }, "jwtf-rt-ring-track");
-  const ringPrev = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": 5 }, "jwtf-rt-ring-prev");
-  const ringArc = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": 5, "stroke-linecap": "round", transform: "rotate(-90 50 50)", "stroke-dasharray": CIRC }, "jwtf-rt-ring-arc");
+  const ringTrack = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": W }, "jwtf-rt-ring-track");
+  const ringPrev = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": W }, "jwtf-rt-ring-prev");
+  const ringArc = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": W, "stroke-linecap": "round", transform: "rotate(-90 50 50)", "stroke-dasharray": CIRC }, "jwtf-rt-ring-arc");
   const tickGroup = svgEl("g", {}, "jwtf-rt-ticks");
   const ticks = Array.from({ length: 60 }, (_, i) => {
     const line = svgEl("line", { x1: 50, y1: 4, x2: 50, y2: i % 5 === 0 ? 14 : 11, "stroke-width": i % 5 === 0 ? 2.4 : 1.6, "stroke-linecap": "round", transform: `rotate(${i * 6} 50 50)` });
     tickGroup.append(line);
     return line;
   });
-  const COMET_SEGMENTS = 10;
-  const COMET_SPAN = 0.3; // fraction of the ring the tail covers
-  const cometGroup = svgEl("g", { transform: "rotate(-90 50 50)" }, "jwtf-rt-comet");
-  const comet = Array.from({ length: COMET_SEGMENTS }, (_, k) => {
-    const seg = svgEl("circle", { cx: 50, cy: 50, r: R, fill: "none", "stroke-width": k === 0 ? 7 : 5, "stroke-linecap": "round" });
-    cometGroup.append(seg);
-    return seg;
-  });
+  // Comet: a conic-gradient tail (masked to the ring) and a head dot, rotated as one piece.
+  const cometTail = el("div", "jwtf-rt-comet-tail");
+  const cometHead = el("span", "jwtf-rt-comet-head");
+  const cometEl = el("div", "jwtf-rt-comet");
+  cometEl.append(cometTail, cometHead);
   // Glass skin: the ring strokes fade from the lap colour to a lighter shade of it.
   const gid = `jwtf-rt-g${Math.random().toString(36).slice(2, 8)}`;
   const defs = svgEl("defs");
   for (const key of ["a", "b"]) {
-    const g = svgEl("linearGradient", { id: `${gid}-${key}`, x1: 0, y1: 0, x2: 1, y2: 1 }, `jwtf-rt-grad-${key}`);
+    const g = svgEl("linearGradient", { id: `${gid}-${key}`, gradientUnits: "userSpaceOnUse", x1: 18, y1: 12, x2: 82, y2: 88 }, `jwtf-rt-grad-${key}`);
     g.append(svgEl("stop", { offset: "0%" }), svgEl("stop", { offset: "100%" }));
     defs.append(g);
   }
@@ -222,13 +221,13 @@ function buildCard(node) {
   const secondHand = svgEl("line", { x1: 50, y1: 56, x2: 50, y2: 11, "stroke-width": 1.8, "stroke-linecap": "round" }, "jwtf-rt-hand");
   const hub = svgEl("circle", { cx: 50, cy: 50, r: 2.6 }, "jwtf-rt-hub");
   dial.append(subDial, minuteHand, secondHand, hub);
-  ringSvg.append(defs, ringTrack, ringPrev, ringArc, tickGroup, cometGroup, dial);
+  ringSvg.append(defs, ringTrack, ringPrev, ringArc, tickGroup, dial);
   const styleBtn = el("button", "jwtf-rt-open jwtf-rt-style-btn", "style");
   styleBtn.type = "button";
   styleBtn.title = "Colours, font and face";
   foot.insertBefore(styleBtn, openBtn);
   const card = el("div", "jwtf-rt-card");
-  card.append(ringSvg, dot, readout, caption, foot);
+  card.append(ringSvg, cometEl, dot, readout, caption, foot);
   const root = el("div", "jwtf-rt-node");
   root.append(card);
 
@@ -257,7 +256,6 @@ function buildCard(node) {
 
   let style = sanitize(node.properties?.jwtf_style);
   let lastSum = null;
-  let lapParity = -1;
   const lapClass = (n) => (n % 2 === 0 ? "jwtf-rt-lap-a" : "jwtf-rt-lap-b");
   function updateRing(p, sum) {
     if (style.face === "analog") {
@@ -279,16 +277,10 @@ function buildCard(node) {
       });
       return;
     }
-    if (style.anim === "comet" && !st.rest) {
-      comet.forEach((seg, k) => {
-        const len = (COMET_SPAN / COMET_SEGMENTS) * CIRC;
-        const start = (st.frac - ((k + 1) / COMET_SEGMENTS) * COMET_SPAN) * CIRC;
-        seg.setAttribute("stroke-dasharray", `${k === 0 ? 0.01 : len + 0.4} ${CIRC}`);
-        seg.setAttribute("stroke-dashoffset", String(-(k === 0 ? st.frac * CIRC : start)));
-        seg.setAttribute("stroke-opacity", String(1 - k / COMET_SEGMENTS));
-        seg.setAttribute("class", cur);
-      });
-      return;
+    if (style.anim === "comet") {
+      cometEl.style.transform = `rotate(${st.rest ? 0 : st.frac * 360}deg)`;
+      cometEl.dataset.lap = st.lap % 2 === 0 ? "a" : "b";
+      if (!st.rest) return;
     }
     // laps: the finished lap stays drawn in the other colour, the current one grows over it
     ringArc.setAttribute("stroke-dashoffset", String(CIRC * (1 - st.frac)));
@@ -297,8 +289,18 @@ function buildCard(node) {
     ringArc.style.stroke = glass ? `url(#${gid}-${st.lap % 2 === 0 ? "a" : "b"})` : "";
     ringPrev.style.stroke = glass ? `url(#${gid}-${st.lap % 2 === 0 ? "b" : "a"})` : "";
     ringPrev.setAttribute("class", `jwtf-rt-ring-prev ${prev}${st.lap > 0 && !st.rest ? " on" : ""}`);
-    lapParity = st.lap % 2;
   }
+
+  // The ring, comet and hands move every frame while a run is going, so they sweep instead of stepping at 10 Hz.
+  let raf = 0;
+  function frame() {
+    raf = 0;
+    const p = controller.primary();
+    if (!p || (style.face !== "ring" && style.face !== "analog")) return;
+    updateRing(p, lastSum);
+    raf = requestAnimationFrame(frame);
+  }
+  const ensureMotion = () => { if (!raf && typeof requestAnimationFrame === "function") raf = requestAnimationFrame(frame); };
 
   function refresh(kind) {
     const p = controller.primary();
@@ -306,6 +308,7 @@ function buildCard(node) {
     if (p) {
       setClock(p.elapsed, true);
       updateRing(p, lastSum);
+      ensureMotion();
       if (kind === "tick" && root.dataset.status === "running") return;
     }
     const sum = nodeSummary(history, labelOf(node));
@@ -407,21 +410,23 @@ function buildCard(node) {
   // cannot be stretched or squashed into something unreadable. The readout scales with the card (container units).
   const digitalRatio = DEFAULT_W / (node.computeSize()[1] + DEFAULT_H - MIN_CARD_H);
   const ratioNow = () => aspectOf(style.face, digitalRatio);
-  const minOf = () => [MIN_W, Math.round(MIN_W / ratioNow())];
+  const minWidth = node.minWidth ?? MIN_W; // a floating timer may be far smaller than a node
+  const minOf = () => [minWidth, Math.round(minWidth / ratioNow())];
   node.min_size = minOf();
   const resized = node.onResize;
   node.onResize = function (size) {
-    size[0] = Math.max(size[0], MIN_W);
+    size[0] = Math.max(size[0], minWidth);
     size[1] = Math.round(size[0] / ratioNow());
     return resized?.call(this, size);
   };
-  const fit = () => { const s = [Math.max(node.size[0], MIN_W), 0]; s[1] = Math.round(s[0] / ratioNow()); node.min_size = minOf(); node.setSize(s); };
+  const fit = () => { const s = [Math.max(node.size[0], minWidth), 0]; s[1] = Math.round(s[0] / ratioNow()); node.min_size = minOf(); node.setSize(s); };
   node._jwtfRunTimerFit = fit;
-  node.size[0] = Math.max(node.size[0], DEFAULT_W);
+  node.size[0] = Math.max(node.size[0], node.minWidth ?? DEFAULT_W); // a saved floating size is kept down to its minimum
   applyStyle();
 
   node._jwtfRunTimerDispose = () => {
     ac.abort();
+    if (raf) cancelAnimationFrame(raf);
     unsubscribe();
     node._jwtfRunTimerDispose = null; // the frontend removes the DOM widget element itself
   };

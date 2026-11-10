@@ -29,6 +29,7 @@ MODULES: tuple[tuple[str, str], ...] = (
     ("draw_image", "Draw Image"),
     ("multi_load", "Multi Load Image"),
     ("mask_composite", "Mask Composite"),
+    ("preview_mirror", "Model Preview Mirror"),
 )
 _ROUTES_FLAG = "_jezzwtf_utility_core_routes"
 

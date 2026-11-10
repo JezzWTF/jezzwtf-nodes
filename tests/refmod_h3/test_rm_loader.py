@@ -1,6 +1,9 @@
 """Ultimate Model Loader: backend priority, quantisation report, CLIP types, sparse guards, interface."""
 from __future__ import annotations
 
+import enum
+import types
+
 import pytest
 
 from refmod_h3 import ultimate_loader as ul
@@ -114,7 +117,7 @@ def test_quant_report_cases() -> None:
     assert ul.quant_report("auto", {"odd": 1}, known).message.startswith("quantised model")
 
 
-def test_clip_type_list_and_auto_fallbacks() -> None:
+def test_clip_type_list_and_auto_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
     names = ul.clip_type_names()
     assert names[0] == "auto" and len(names) == len(set(names))
     rest = names[1:]
@@ -127,6 +130,13 @@ def test_clip_type_list_and_auto_fallbacks() -> None:
     assert ul.auto_clip_type("minimax_h3") in ("minimax", "minimax_h3", "hunyuan_video")
     assert ul.auto_clip_type("moss") in ("moss_image", "stable_diffusion")
     assert ul.auto_clip_type("unheard_of") == "stable_diffusion"
+    # a stand-in comfy.sd, so the result does not depend on which optional ComfyUI dependencies are installed
+    class FakeCLIPType(enum.Enum):
+        STABLE_DIFFUSION = 1
+        FLUX = 2
+
+    monkeypatch.setattr(ul._comfy, "optional_module", lambda name: types.SimpleNamespace(CLIPType=FakeCLIPType))
+    assert ul.clip_type_value("flux", "default") is FakeCLIPType.FLUX
     with pytest.raises(RefModError, match="unknown CLIP type"):
         ul.clip_type_value("not_a_type", "default")
 

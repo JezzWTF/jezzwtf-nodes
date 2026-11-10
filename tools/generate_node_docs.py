@@ -123,8 +123,8 @@ def input_row(name: str, spec: object, optional: bool) -> str:
             text += f" (default: {shown})"
         elif kind == "COMBO" and len(str(shown)) <= 40:
             text += f" (default: `{shown}`)"
-    shown_kind = "choice" if kind == "COMBO" else kind
-    return f"| `{name}` | {cell(text)} | {shown_kind.upper() if shown_kind != 'choice' else 'COMBO'} | {'No' if optional else 'Yes'} | {cell(range_cell(kind, opts))} |"
+    shown_kind = "ANY (matches what is connected)" if kind == "COMFY_MATCHTYPE_V3" else kind.upper()
+    return f"| `{name}` | {cell(text)} | {shown_kind} | {'No' if optional else 'Yes'} | {cell(range_cell(kind, opts))} |"
 
 
 def page(node_id: str, node: dict, summaries: dict[str, str], topics: list[tuple[str, str, str]]) -> str:
@@ -140,10 +140,10 @@ def page(node_id: str, node: dict, summaries: dict[str, str], topics: list[tuple
     outputs = list(zip(node.get("output_name") or [], node.get("output") or [], node.get("output_tooltips") or [None] * 99))
     if outputs:
         lines += ["## Outputs", "", "| Output Name | Description | Data Type |", "|-------------|-------------|-----------|"]
-        lines += [f"| `{n}` | {cell(str(tip) if tip else COMMON.get(n) or humanise(n))} | {str(t).upper()} |" for n, t, tip in outputs]
+        lines += [f"| `{n}` | {cell(str(tip) if tip else COMMON.get(n) or humanise(n))} | {'ANY (matches what is connected)' if str(t).upper() == 'COMFY_MATCHTYPE_V3' else str(t).upper()} |" for n, t, tip in outputs]
         lines.append("")
     needle = display.lower()
-    match = next((t for t in topics if needle in t[2]), None)
+    match = next((t for t in topics if re.search(rf"^#+ .*{re.escape(needle)}", t[2], re.MULTILINE)), None)  # a page with a heading for this node
     pointer = f"the **{match[1]}** page" if match else "the guide"
     lines += ["Notes:", "", f"- More detail, including how this node fits with the others, is in {pointer} of the JezzWTF Documentation window (Alt+Shift+D).", ""]
     return "\n".join(lines)

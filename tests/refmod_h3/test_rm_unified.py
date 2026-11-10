@@ -176,6 +176,38 @@ def test_apply_flux3_needs_positive_and_keeps_negative_rules(refmod_root: str) -
     assert neg is negative
 
 
+def test_extra_image_scale_matches_the_first_reference_area(refmod_root: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    bake(refmod_root, "qwen21", "alice", n=1)
+    handler = unified.HANDLERS["qwen21"]
+    seen: list[int] = []
+    real = handler.encode
+
+    def spy(h: unified.Handler, vae: object, frame: torch.Tensor, resolution: int) -> unified.Encoded:
+        seen.append(resolution)
+        return real(h, vae, frame, resolution)
+
+    monkeypatch.setattr(handler, "encode", spy)
+    node = unified.JWTFUnifiedRefModApply
+    extra, vae = torch.rand(1, 64, 64, 3), FakeImageVAE(64)
+    first = unified.load_refs(os.path.join(refmod_root, "qwen21", "alice.safetensors"))[2][0]
+    expected = unified.matched_resolution([first], 999)
+    assert expected == round((first.shape[-3] * first.shape[-2]) ** 0.5) and expected != 999
+    legacy(node.execute("qwen21", "qwen21/alice", clip=FakeClip(), extra_image=extra, vae=vae, extra_image_resolution=999,
+                        extra_image_scale=unified.EXTRA_SCALE_RESOLUTION))
+    legacy(node.execute("qwen21", "qwen21/alice", clip=FakeClip(), extra_image=extra, vae=vae, extra_image_resolution=999,
+                        extra_image_scale=unified.EXTRA_SCALE_MATCH))
+    legacy(node.execute("qwen21", unified.NONE, clip=FakeClip(), extra_image=extra, vae=vae, extra_image_resolution=999,
+                        extra_image_scale=unified.EXTRA_SCALE_MATCH))  # no saved reference: falls back
+    assert seen == [999, expected, 999]
+
+
+def test_matched_resolution_edge_cases() -> None:
+    assert unified.matched_resolution([], 512) == 512
+    assert unified.matched_resolution([torch.zeros(3)], 512) == 512
+    assert unified.matched_resolution([torch.zeros(1, 256, 1024, 3)], 512) == 512  # sqrt of the area, whatever the aspect
+    assert unified.matched_resolution([torch.zeros(8, 8, 3)], 512) == 32
+
+
 def test_apply_error_paths(refmod_root: str) -> None:
     bake(refmod_root, "qwen21", "q", n=1)
     bake(refmod_root, "flux3", "f", n=1)

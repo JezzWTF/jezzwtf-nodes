@@ -34,7 +34,8 @@ log = logging.getLogger("jezzwtf.refmod_h3")
 
 AUTO = "auto (from refmod)"
 NONE = "None"
-EXTRA_SCALE_LABELS = ("keep aspect (resolution)", "match first reference")
+EXTRA_SCALE_RESOLUTION, EXTRA_SCALE_MATCH = "keep aspect (resolution)", "match first reference"
+EXTRA_SCALE_LABELS = (EXTRA_SCALE_RESOLUTION, EXTRA_SCALE_MATCH)
 TOKEN_DOWNSCALE = 16
 THUMB_EDGE = 192
 
@@ -105,6 +106,18 @@ def resize32(frame: torch.Tensor, resolution: int) -> torch.Tensor:
         return frame
     bchw = frame.movedim(-1, 1)
     return _comfy.common_upscale(bchw, tw, th, "lanczos", "disabled").movedim(1, -1)
+
+
+def matched_resolution(refs: list[torch.Tensor], fallback: int) -> int:
+    """The `resolution` that gives an extra image the pixel area of the first stored reference (`fallback` with none).
+
+    Handlers size an image to about resolution x resolution pixels and keep its aspect, so the square root of the
+    first reference's area is the matching value.
+    """
+    if not refs or refs[0].dim() < 3:
+        return fallback
+    height, width = int(refs[0].shape[-3]), int(refs[0].shape[-2])
+    return max(32, int(round(math.sqrt(height * width)))) if height > 0 and width > 0 else fallback
 
 
 def rgb_over_white(frame: torch.Tensor) -> torch.Tensor:
@@ -584,7 +597,7 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
                 io.Image.Input("extra_image", optional=True, tooltip="Additional images encoded at runtime and appended to the saved references."),
                 io.Vae.Input("vae", optional=True, tooltip="VAE matching the selected model family, required when extra images are connected."),
                 io.Int.Input("extra_image_resolution", default=1024, min=0, max=4096, step=16, optional=True, tooltip="Square root of the target pixel area for encoding extra images, with 0 using source dimensions before model-specific rounding."),
-                io.Combo.Input("extra_image_scale", options=list(EXTRA_SCALE_LABELS), default='keep aspect (resolution)', optional=True, tooltip="The extra image is currently resized using the resolution setting for either scale choice."),
+                io.Combo.Input("extra_image_scale", options=list(EXTRA_SCALE_LABELS), default='keep aspect (resolution)', optional=True, tooltip="How the extra image is sized: to the resolution setting, or to the pixel area of the first saved reference (its own aspect is kept). With no saved reference the resolution setting is used."),
                 io.Float.Input("ref_strength", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Fraction of the denoising schedule during which the references are active, for models that support scheduling."),
                 io.Boolean.Input("ref_on_negative", default=True, optional=True, tooltip="Also attaches the references to negative conditioning on model families that support this option."),
             ],
@@ -643,8 +656,11 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
         if isinstance(extra_image, torch.Tensor) and extra_image.numel():
             if vae is None:
                 raise RefModError("extra_image needs the vae connected")
+            resolution = int(extra_image_resolution)
+            if extra_image_scale == EXTRA_SCALE_MATCH:
+                resolution = matched_resolution(imgs, resolution)  # only the saved references count, not earlier extras
             for f in _frames_of(extra_image):
-                e = h.encode(h, vae, f.float(), int(extra_image_resolution))
+                e = h.encode(h, vae, f.float(), resolution)
                 lats.append(e.lat)
                 if e.img is not None:
                     imgs.append(e.img)

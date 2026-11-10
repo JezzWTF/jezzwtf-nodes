@@ -18,7 +18,7 @@ Apply saved RefMods to Qwen, Fibo or Flux image-edit conditioning, with the mode
 | `extra_image` | Additional images encoded at runtime and appended to the saved references. | IMAGE | No |  |
 | `vae` | VAE matching the selected model family, required when extra images are connected. | VAE | No |  |
 | `extra_image_resolution` | Square root of the target pixel area for encoding extra images, with 0 using source dimensions before model-specific rounding. (default: 1024) | INT | No | 0 to 4096 (step 16) |
-| `extra_image_scale` | The extra image is currently resized using the resolution setting for either scale choice. (default: `keep aspect (resolution)`) | COMBO | No | `"keep aspect (resolution)"`<br>`"match first reference"` |
+| `extra_image_scale` | How the extra image is sized: to the resolution setting, or to the pixel area of the first saved reference (its own aspect is kept). With no saved reference the resolution setting is used. (default: `keep aspect (resolution)`) | COMBO | No | `"keep aspect (resolution)"`<br>`"match first reference"` |
 | `ref_strength` | Fraction of the denoising schedule during which the references are active, for models that support scheduling. (default: 1.0) | FLOAT | No | 0 to 1 (step 0.01) |
 | `ref_on_negative` | Also attaches the references to negative conditioning on model families that support this option. (default: true) | BOOLEAN | No |  |
 

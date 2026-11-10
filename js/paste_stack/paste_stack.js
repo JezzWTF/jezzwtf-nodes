@@ -1,6 +1,7 @@
 // Paste Stack: a floating, persistent clipboard-history panel for the ComfyUI web UI.
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
+import { createBackdrop } from "./backdrop.js";
 import {
   LIMITS, base64ToBytes, classifyFile, clamp, findDuplicate, fingerprint, formatSize, imageMimeFromName,
   looksLikeImagePath, makeId, moveInArray, nextTopOrd, nodeAcceptsImage, normalizeLimit, normalizeOrder,
@@ -15,6 +16,7 @@ const UI_KEY = "jezzwtf.pasteStack.ui";
 const CLIPBOARD_ROUTE = "/jezzwtf/paste_stack/clipboard";
 const SET_ENABLED = "JezzWTF.PasteStack.Enabled";
 const SET_LIMIT = "JezzWTF.PasteStack.Limit";
+const SET_BACKDROP = "JezzWTF.PasteStack.Backdrop";
 const CHIP = 46;
 const DRAG_THRESHOLD = 6;
 const PANEL_DRAG_THRESHOLD = 4;
@@ -38,7 +40,7 @@ if (!window[GUARD]) {
   app.registerExtension({
     name: EXT_NAME,
     async setup() {
-      const settings = { enabled: true, limit: LIMITS.defaultEntries };
+      const settings = { enabled: true, limit: LIMITS.defaultEntries, backdrop: true };
       let widget = null;
       try {
         app.ui.settings.addSetting({
@@ -50,7 +52,12 @@ if (!window[GUARD]) {
           attrs: { min: LIMITS.minEntries, max: LIMITS.maxEntries, step: 5 },
           onChange: (v) => { settings.limit = normalizeLimit(v); widget?.setLimit(settings.limit); },
         });
+        app.ui.settings.addSetting({
+          id: SET_BACKDROP, name: "JezzWTF Paste Stack: animated backdrop (WebGL2; falls back to a still gradient)", type: "boolean", defaultValue: true,
+          onChange: (v) => { settings.backdrop = !!v; widget?.setBackdrop(settings.backdrop); },
+        });
         settings.enabled = !!app.ui.settings.getSettingValue(SET_ENABLED, true);
+        settings.backdrop = !!app.ui.settings.getSettingValue(SET_BACKDROP, true);
         settings.limit = normalizeLimit(app.ui.settings.getSettingValue(SET_LIMIT, LIMITS.defaultEntries));
       } catch { /* old frontend without the settings API: defaults apply */ }
       widget = await createWidget(settings);
@@ -143,6 +150,8 @@ async function createWidget(settings) {
 
   const ui = { w: 300, h: 310, state: "open", ...loadUi() };
   let enabled = settings.enabled;
+  let backdropOn = settings.backdrop !== false;
+  let backdrop = null;
   let limit = settings.limit;
   let items = [];
   let dbBroken = false;
@@ -175,7 +184,8 @@ async function createWidget(settings) {
     el("span", "jwtf-ps-paste-main", { text: "Click here to paste" }),
     el("span", "jwtf-ps-hint", { text: "Or hover and press Ctrl+V. You can also drop files here." }));
   const toast = el("div", "jwtf-ps-toast", { role: "status", "aria-live": "polite" });
-  const panel = el("section", "jwtf-ps-panel", { role: "region", "aria-label": "Paste stack" }, head, list, pasteBtn, toast);
+  const fx = el("canvas", "jwtf-ps-fx", { "aria-hidden": "true", hidden: true });
+  const panel = el("section", "jwtf-ps-panel", { role: "region", "aria-label": "Paste stack" }, fx, head, list, pasteBtn, toast);
   const badge = el("span", "jwtf-ps-badge");
   const chip = el("button", "jwtf-ps-chip", { type: "button", "aria-label": "Open paste stack" },
     iconClipboard(), badge);
@@ -214,6 +224,7 @@ async function createWidget(settings) {
   function ripple(x, y) {
     if (ui.state !== "open") return;
     const r = panel.getBoundingClientRect();
+    backdrop?.ripple(x - r.left, y - r.top);
     const dot = el("span", "jwtf-ps-ripple");
     dot.style.left = `${x - r.left}px`;
     dot.style.top = `${y - r.top}px`;
@@ -257,6 +268,18 @@ async function createWidget(settings) {
     }
   }
 
+  /** The backdrop runs only while the panel is open, enabled and the setting is on; otherwise the CSS gradient shows. */
+  function syncBackdrop() {
+    const want = enabled && backdropOn && ui.state !== "chip" && !root.hidden;
+    if (!want) { backdrop?.setActive(false); fx.hidden = true; return; }
+    fx.hidden = false;
+    backdrop ??= createBackdrop(fx, panel, () => Math.min(1, items.length / Math.max(1, limit)));
+    if (!backdrop) { fx.hidden = true; return; }
+    backdrop.setActive(true);
+  }
+
+  function setBackdrop(v) { backdropOn = !!v; syncBackdrop(); }
+
   function applyState() {
     const open = ui.state !== "chip";
     root.dataset.open = open ? "1" : "0";
@@ -264,6 +287,7 @@ async function createWidget(settings) {
     chip.hidden = open;
     if (open) { panel.style.width = `${ui.w}px`; panel.style.height = `${ui.h}px`; }
     place();
+    syncBackdrop();
   }
 
   function minimize() {
@@ -290,6 +314,7 @@ async function createWidget(settings) {
     enabled = !!v;
     if (!enabled) { cancelDrag(); endEdit(true); hovering = false; }
     place();
+    syncBackdrop();
     if (enabled) renderAll();
   }
 
@@ -671,6 +696,14 @@ async function createWidget(settings) {
     }
   }
 
+  // ---- backdrop pointer glow
+  panel.addEventListener("pointermove", (e) => {
+    if (!backdrop) return;
+    const r = panel.getBoundingClientRect();
+    backdrop.point(e.clientX - r.left, e.clientY - r.top);
+  }, sig);
+  panel.addEventListener("pointerleave", () => backdrop?.point(null), sig);
+
   // ---- panel buttons
   pasteBtn.addEventListener("click", (e) => { ripple(e.clientX, e.clientY); pasteFromClipboard(); }, sig);
   minBtn.addEventListener("click", minimize, sig);
@@ -980,6 +1013,7 @@ async function createWidget(settings) {
 
   function destroy() {
     ac.abort();
+    backdrop?.dispose();
     teardownDrag();
     for (const id of timers) clearTimeout(id);
     timers.clear();
@@ -994,5 +1028,5 @@ async function createWidget(settings) {
     window[GUARD] = false;
   }
 
-  return { setEnabled, setLimit, destroy };
+  return { setEnabled, setLimit, setBackdrop, destroy };
 }

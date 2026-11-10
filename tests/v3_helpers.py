@@ -39,6 +39,19 @@ def hidden(node: type[io.ComfyNode], **values: Any) -> Iterator[None]:
             node.hidden = previous
 
 
+def force_cpu() -> None:
+    """Make ComfyUI's model management pick the CPU, so importing it works on machines without a GPU (CI)."""
+    try:
+        from comfy.cli_args import args  # type: ignore[import-not-found]
+
+        args.cpu = True
+    except Exception:  # noqa: BLE001 - no ComfyUI on the path: the nodes treat that as "outside ComfyUI"
+        pass
+
+
+force_cpu()
+
+
 def install_default_hidden() -> None:
     """Give every node an empty hidden holder so `cls.hidden.unique_id` is None outside the executor."""
     io.ComfyNode.hidden = io.HiddenHolder.from_dict({})

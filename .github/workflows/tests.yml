@@ -31,9 +31,11 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/ComfyUI
         run: |
+          status=0
           for d in tests/*/; do
-            python -m pytest "$d" -q -p no:cacheprovider
+            python -m pytest "$d" -q -p no:cacheprovider || status=1
           done
+          exit $status
       - name: JavaScript syntax check
         run: |
           for f in $(find js -name '*.js'); do

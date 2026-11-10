@@ -1,0 +1,43 @@
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The nodes use ComfyUI's V3 API (comfy_api), so the tests need a ComfyUI checkout on the path.
+      - uses: actions/checkout@v4
+        with:
+          repository: comfyanonymous/ComfyUI
+          path: ComfyUI
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r ComfyUI/requirements.txt
+          python -m pip install pytest
+      - name: Run tests, one family at a time
+        env:
+          PYTHONPATH: ${{ github.workspace }}/ComfyUI
+        run: |
+          status=0
+          for d in tests/*/; do
+            python -m pytest "$d" -q -p no:cacheprovider || status=1
+          done
+          exit $status
+      - name: JavaScript syntax check
+        run: |
+          for f in $(find js -name '*.js'); do
+            node --check --input-type=module < "$f"
+          done

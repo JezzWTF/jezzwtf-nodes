@@ -1,14 +1,22 @@
 [project]
-name = "comfyui-jezzwtf-nodes"
-description = "JezzWTF custom nodes for ComfyUI — utility nodes."
-version = "1.0.0"
+name = "jezzwtf-nodes"
+description = "Quality-of-life nodes for ComfyUI: Compare videos, character chat and cards, MiniMax H3 RefMod, optimised GIFs, run timer, paste stack, and plenty more"
+version = "1.1.0"
 license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.10"
 dependencies = []
+classifiers = [
+    "Operating System :: OS Independent",
+    "Environment :: GPU :: NVIDIA CUDA",
+]
 
 [project.urls]
-Repository = "https://github.com/JezzWTF/comfyui-jezzwtf-nodes"
+Repository = "https://github.com/JezzWTF/jezzwtf-nodes"
+"Bug Tracker" = "https://github.com/JezzWTF/jezzwtf-nodes/issues"
 
 [tool.comfy]
 PublisherId = "jezzwtf"
-DisplayName = "JezzWTF Nodes"
-Icon = ""
+DisplayName = "JezzWTF QoL Nodes"
+Icon = "https://raw.githubusercontent.com/JezzWTF/jezzwtf-nodes/main/assets/icon.svg"
+requires-comfyui = ">=0.44.0"

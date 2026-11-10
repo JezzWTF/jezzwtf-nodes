@@ -1,0 +1,139 @@
+"""Match Image Size: resize an IMAGE or MASK to a reference or explicit size.
+
+Follows the behavioural spec exactly, quirks included: the `mask` output is channel 0
+of the result (the red channel for an IMAGE), a MASK input yields a single-channel
+`[B,H,W,1]` image, `round_to` only applies to computed sides, and every mode needs both
+target dimensions to resolve.
+"""
+from __future__ import annotations
+
+import torch
+
+from comfy_api.latest import io
+
+from ._comfy import upscale
+
+RESIZE_TYPES = (
+    "scale dimensions", "fit within", "fill (crop)", "pad to",
+    "shortest side", "longest side", "fit width", "fit height",
+)
+SCALE_METHODS = ("nearest-exact", "bilinear", "area", "bicubic", "lanczos")
+
+
+def parse_hex_color(value: str) -> tuple[float, float, float]:
+    try:
+        s = value.strip().lstrip("#")
+        if len(s) == 3:
+            s = "".join(ch * 2 for ch in s)
+        if len(s) != 6:
+            raise ValueError(value)
+        return (int(s[0:2], 16) / 255.0, int(s[2:4], 16) / 255.0, int(s[4:6], 16) / 255.0)
+    except (ValueError, AttributeError):
+        return (0.0, 0.0, 0.0)
+
+
+def round_to(v: float, r: int) -> int:
+    r = max(1, int(r))
+    return max(r, int(round(v / r)) * r)
+
+
+def resolve_target(width: int, height: int, ref_wh: tuple[int, int] | None) -> tuple[int, int]:
+    """Return (tw, th); a 0 means "use the reference". Both must resolve, whatever the mode."""
+    tw = width if width > 0 else (ref_wh[0] if ref_wh else 0)
+    th = height if height > 0 else (ref_wh[1] if ref_wh else 0)
+    if tw <= 0 or th <= 0:
+        raise ValueError("Match Image Size: connect a reference_image or set width and height explicitly.")
+    return tw, th
+
+
+def compute_size(mode: str, w: int, h: int, tw: int, th: int, r: int = 1) -> tuple[int, int, bool]:
+    """Return (out_w, out_h, center_crop) for source (w, h) and target (tw, th)."""
+    r = max(1, int(r))
+    if mode in ("scale dimensions", "fill (crop)"):
+        return tw, th, mode == "fill (crop)"
+    if mode == "fit width":
+        nw, nh = tw, round_to(h * tw / w, r)
+    elif mode == "fit height":
+        nw, nh = round_to(w * th / h, r), th
+    elif mode == "shortest side":
+        nw, nh = (tw, round_to(h * tw / w, r)) if w <= h else (round_to(w * tw / h, r), tw)
+    elif mode == "longest side":
+        nw, nh = (tw, round_to(h * tw / w, r)) if w >= h else (round_to(w * tw / h, r), tw)
+    elif mode in ("fit within", "pad to"):
+        s = min(tw / w, th / h)
+        nw, nh = round_to(w * s, r), round_to(h * s, r)
+    else:
+        raise ValueError(f"unknown resize_type: {mode}")
+    return max(r, nw), max(r, nh), False
+
+
+def pad_center(x: torch.Tensor, tw: int, th: int, color: tuple[float, float, float]) -> torch.Tensor:
+    """Paste `[B,C,h,w]` centred on a `[B,C,th,tw]` canvas filled with `color` (channels 0..min(C,3)-1)."""
+    b, c, h, w = x.shape
+    canvas = torch.zeros((b, c, th, tw), dtype=x.dtype, device=x.device)
+    for ch in range(min(c, 3)):
+        canvas[:, ch] = color[ch]
+    ox, oy = (tw - w) // 2, (th - h) // 2
+    dx0, dy0 = max(0, ox), max(0, oy)
+    sx0, sy0 = dx0 - ox, dy0 - oy
+    cw, chh = min(w - sx0, tw - dx0), min(h - sy0, th - dy0)
+    if cw > 0 and chh > 0:
+        canvas[:, :, dy0:dy0 + chh, dx0:dx0 + cw] = x[:, :, sy0:sy0 + chh, sx0:sx0 + cw]
+    return canvas
+
+
+def _wh(t: torch.Tensor) -> tuple[int, int]:
+    return (int(t.shape[-1]), int(t.shape[-2])) if t.dim() == 3 else (int(t.shape[2]), int(t.shape[1]))
+
+
+def match_size(inp: torch.Tensor, resize_type: str, scale_method: str, reference: torch.Tensor | None = None,
+               width: int = 0, height: int = 0, crop: str = "center", pad_color: str = "#000000",
+               rnd: int = 1) -> tuple[torch.Tensor, torch.Tensor, int, int]:
+    x = inp.unsqueeze(1) if inp.dim() == 3 else inp.movedim(-1, 1)
+    _, _, h, w = x.shape
+    tw, th = resolve_target(width, height, _wh(reference) if reference is not None else None)
+    nw, nh, center = compute_size(resize_type, w, h, tw, th, rnd)
+    if resize_type == "scale dimensions":
+        center = crop == "center"
+    y = upscale(x, nw, nh, scale_method, "center" if center else "disabled")
+    if resize_type == "pad to":
+        y = pad_center(y, tw, th, parse_hex_color(pad_color))
+    image = y.movedim(1, -1).contiguous()
+    return image, y[:, 0].contiguous(), int(y.shape[-1]), int(y.shape[-2])
+
+
+class JWTFMatchImageSize(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFMatchImageSize",
+            display_name='Match Image Size',
+            category='JezzWTF/image',
+            inputs=[
+                io.Custom("IMAGE,MASK").Input("input", tooltip="Image or mask to resize."),
+                io.Combo.Input("resize_type", options=list(RESIZE_TYPES), default='scale dimensions', tooltip="Determines whether to scale, fit, crop or pad the source to the target dimensions."),
+                io.Combo.Input("scale_method", options=list(SCALE_METHODS), default='lanczos', tooltip="Interpolation filter used when resampling the source."),
+                io.Custom("IMAGE,MASK").Input("reference_image", optional=True, tooltip="Image or mask supplying target dimensions for any explicit side set to 0."),
+                io.Int.Input("width", default=0, min=0, max=16384, optional=True, tooltip="Target width in pixels, with 0 taking the reference width."),
+                io.Int.Input("height", default=0, min=0, max=16384, optional=True, tooltip="Target height in pixels, with 0 taking the reference height."),
+                io.Combo.Input("crop", options=['center', 'disabled'], default='center', optional=True, tooltip="In scale dimensions mode, selects centre cropping or direct resizing to the target aspect ratio."),
+                io.String.Input("pad_color", default='#000000', optional=True, tooltip="Hex colour used around the centred result in pad to mode, with invalid values falling back to black."),
+                io.Int.Input("round_to", default=1, min=1, max=128, optional=True, tooltip="Pixel multiple for rounding calculated sides, with 1 leaving them rounded to whole pixels."),
+            ],
+            outputs=[
+                io.Image.Output("image", tooltip="Resized image, with one channel when the source is a mask."),
+                io.Mask.Output("mask", tooltip="First channel of the resized result, which is red for an RGB image."),
+                io.Int.Output("width", tooltip="Actual result width in pixels."),
+                io.Int.Output("height", tooltip="Actual result height in pixels."),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, input: torch.Tensor, resize_type: str, scale_method: str,  # noqa: A002 - socket name
+            reference_image: torch.Tensor | None = None, width: int = 0, height: int = 0,
+            crop: str = "center", pad_color: str = "#000000", round_to: int = 1
+            ) -> io.NodeOutput:
+        return io.NodeOutput(*match_size(input, resize_type, scale_method, reference_image, width, height, crop, pad_color, round_to))
+
+
+NODES = [JWTFMatchImageSize]

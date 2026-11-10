@@ -1,0 +1,8 @@
+# Development-only files kept in git but not shipped in the registry archive
+tests/
+specs/
+assets/
+.github/
+.vscode/
+*.md.bak
+CONTRIBUTING.md

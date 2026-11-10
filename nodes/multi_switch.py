@@ -1,58 +1,35 @@
+from __future__ import annotations
+
+from comfy_api.latest import io
+
 MAX_SLOTS = 6
 
 
-class AnyType(str):
-    """Compares equal to every type so ComfyUI accepts any connection."""
-
-    def __ne__(self, other: object) -> bool:
-        return False
-
-
-ANY = AnyType("*")
-
-
-class ContainsAnyDict(dict):
-    """An empty dict that reports containing any key.
-    Empty → ComfyUI renders no input slots from the Python definition.
-    __contains__ always True → any JS-added input name passes validation.
-    dict subclass → JSON serialisable (serialises as {})."""
-
-    def __contains__(self, key: object) -> bool:
-        return True
-
-    def __getitem__(self, key: str) -> tuple:
-        return (ANY, {})
-
-
-class MultiSwitch:
-    TITLE = "Multi Switch"
-    CATEGORY = "JezzWTF/utils"
+class MultiSwitch(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="MultiSwitch",
+            display_name='Multi Switch',
+            category='JezzWTF/utils',
+            inputs=[
+                io.Boolean.Input("switch", default=False, label_on='true', label_off='false', tooltip='Selects the true inputs when enabled and the false inputs when disabled, routing each slot to its corresponding output.'),
+            ],
+            accept_all_inputs=True,  # the front end adds true_N / false_N inputs on the fly
+            outputs=[
+                io.AnyType.Output("output_1", tooltip="Passes through true_1 when the switch is true or false_1 when it is false, returning no value if that input is disconnected."),
+                io.AnyType.Output("output_2", tooltip="Passes through true_2 when the switch is true or false_2 when it is false, returning no value if that input is disconnected."),
+                io.AnyType.Output("output_3", tooltip="Passes through true_3 when the switch is true or false_3 when it is false, returning no value if that input is disconnected."),
+                io.AnyType.Output("output_4", tooltip="Passes through true_4 when the switch is true or false_4 when it is false, returning no value if that input is disconnected."),
+                io.AnyType.Output("output_5", tooltip="Passes through true_5 when the switch is true or false_5 when it is false, returning no value if that input is disconnected."),
+                io.AnyType.Output("output_6", tooltip="Passes through true_6 when the switch is true or false_6 when it is false, returning no value if that input is disconnected."),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "switch": ("BOOLEAN", {
-                    "default": False,
-                    "label_on": "true",
-                    "label_off": "false",
-                    "tooltip": "Option A → false_N inputs pass through.  Option B → true_N inputs pass through.",
-                }),
-            },
-            "optional": ContainsAnyDict(),
-            "hidden": {
-                "num_slots": ("INT", {"default": 2}),
-            },
-        }
-
-    @classmethod
-    def VALIDATE_INPUTS(cls, input_types):
-        return True
-
-    RETURN_TYPES = (ANY,) * MAX_SLOTS
-    RETURN_NAMES = tuple(f"output_{i}" for i in range(1, MAX_SLOTS + 1))
-    FUNCTION = "execute"
-
-    def execute(self, switch: bool, num_slots: int = 2, **kwargs) -> tuple:
+    def execute(cls, switch: bool, **kwargs: object) -> io.NodeOutput:
         side = "true" if switch else "false"
-        return tuple(kwargs.get(f"{side}_{i}", None) for i in range(1, MAX_SLOTS + 1))
+        return io.NodeOutput(*(kwargs.get(f"{side}_{i}") for i in range(1, MAX_SLOTS + 1)))
+
+
+NODES = [MultiSwitch]

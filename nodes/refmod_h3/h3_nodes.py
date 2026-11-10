@@ -1,0 +1,540 @@
+"""MiniMax H3 RefMod nodes: Bake, Loader, Apply and the clip-tail trio (spec section 7)."""
+from __future__ import annotations
+
+import json
+import logging
+import os
+
+import torch
+
+from comfy_api.latest import io
+from .curves import DIRECTIONS, SCRAMBLE_MODES, SHAPES
+
+from ._types import RefModError, UIPayload
+from .bundle import RefMod, finite_unit, write_bundle
+from .curves import Row, apply_rows, check_budget
+from .extract import (
+    H3_FPS, folder_change_key, load_folder, make_audio, make_visual, valid_len,
+    write_sidecars,
+)
+from .library import (
+    MOD_CACHE, combo_choices, file_stamp, library_entry, mod_output_path, normalise_name,
+    resolve_path, resolve_stem, sanitise_save_name,
+)
+
+log = logging.getLogger("jezzwtf.refmod_h3")
+
+SLOTS = 4
+COMPONENTS = ("All", "Visual", "Audio")
+AUDIO_TYPES = ("voice", "singing", "music_style", "sound_fx", "ambience")
+INT31 = 2 ** 31 - 1
+TAIL_SUBFOLDER = "_tail"
+
+UNIT = {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}
+
+
+# --------------------------------------------------------------------------- slots / collect
+
+def _num(kwargs: dict[str, object], key: str, default: float) -> float:
+    v = kwargs.get(key, default)
+    return float(v) if isinstance(v, (int, float)) else default
+
+
+def collect_slots(kwargs: dict[str, object], budget: int) -> tuple[list[Row], str, list[str]]:
+    rows: list[tuple[RefMod, float, int]] = []
+    for i in range(1, SLOTS + 1):
+        name = normalise_name(kwargs.get(f"mod_{i}"))
+        master = finite_unit(_num(kwargs, f"strength_{i}", 1.0), f"strength_{i}")
+        if not name or master <= 0:
+            continue
+        vis = finite_unit(_num(kwargs, f"visual_strength_{i}", 1.0), f"visual_strength_{i}")
+        aud = finite_unit(_num(kwargs, f"audio_strength_{i}", 1.0), f"audio_strength_{i}")
+        comp = str(kwargs.get(f"components_{i}", "All") or "All")
+        copies = max(1, int(_num(kwargs, f"copies_{i}", 1)))
+        path = resolve_path(name)
+        for mod in MOD_CACHE.load(path):
+            weight = vis if mod.is_visual else aud
+            if weight <= 0 or (comp == "Visual" and not mod.is_visual) or (comp == "Audio" and mod.is_visual):
+                continue
+            rows.append((mod, master * weight, copies))
+    expanded: list[Row] = [(m, s) for m, s, c in rows for _ in range(c)]
+    total = check_budget(expanded, budget)
+    hint = "; ".join(f"{m.concept_type}: {m.description}" for m, _, _ in rows if m.description)
+    lines = [
+        f"{m.name} [{m.kind}] strength {s:.2f}{f' x{c}' if c > 1 else ''} - {m.token_count * c} tokens"
+        for m, s, c in rows
+    ]
+    lines.append(f"total: {total} tokens" + (f" / budget {budget}" if budget > 0 else ""))
+    return expanded, hint, lines
+
+
+def mod_details(mod: RefMod) -> str:
+    shape = "x".join(str(s) for s in mod.latent.shape)
+    return (f"{mod.name}: kind={mod.kind} latent={shape} tokens={mod.token_count} source={mod.source} "
+            f"[{mod.source_shape}] {mod.pool} tags={mod.tags} concept={mod.concept_type}"
+            + (f" desc={mod.description!r}" if mod.description else ""))
+
+
+def slots_is_changed(kwargs: dict[str, object]) -> tuple[object, ...]:
+    out: list[object] = []
+    for i in range(1, SLOTS + 1):
+        v = kwargs.get(f"mod_{i}")
+        if v is None:
+            out.append(float("nan"))
+            continue
+        name = normalise_name(v)
+        if not name:
+            continue
+        stem = resolve_stem(name)
+        out.append(file_stamp(stem + ".safetensors") if stem else (name, "missing"))
+    return tuple(out)
+
+
+# --------------------------------------------------------------------------- bake
+
+def _first_frame(t: torch.Tensor | None) -> torch.Tensor | None:
+    if t is None or not isinstance(t, torch.Tensor) or t.numel() == 0:
+        return None
+    return t[:1] if t.dim() == 4 else t.unsqueeze(0)
+
+
+def bake_bundle(dest: str, name: str, mods: list[RefMod]) -> list[RefMod]:
+    write_bundle(dest, name, mods)
+    MOD_CACHE.clear()
+    return MOD_CACHE.load(dest)
+
+
+class JWTFRefModBake(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRefModBake",
+            display_name='RefMod Bake (Character)',
+            category='JezzWTF/refmod',
+            description='Bake portrait stills, a clip and/or a voice into one reusable H3 RefMod bundle.',
+            inputs=[
+                io.String.Input("name", default='my_character', tooltip='File name. Saved to models/refmods/<subfolder>/<name>.safetensors; the saved_path output holds the full path.'),
+                io.Vae.Input("vae", tooltip="MiniMax H3 video VAE used to encode visual references."),
+                io.Image.Input("images", optional=True, tooltip="Image batch whose frames are encoded as separate still references."),
+                io.Image.Input("video_frames", optional=True, tooltip="Frame batch treated as one video reference."),
+                io.String.Input("folder", default='', optional=True, tooltip="Optional folder of reference media, with relative paths resolved under ComfyUI's input folder."),
+                io.Audio.Input("audio", optional=True, tooltip="Optional audio clip to encode as a separate reference."),
+                io.Vae.Input("audio_vae", optional=True, tooltip="MiniMax H3 audio VAE required to encode a connected audio reference."),
+                io.Combo.Input("audio_type", options=list(AUDIO_TYPES), default='voice', optional=True, tooltip="Concept type stored with the audio reference and used in prompt hints."),
+                io.Float.Input("audio_max_seconds", default=30.0, min=0.025, max=600.0, step=0.5, optional=True, tooltip="Maximum duration in seconds of the audio used for the reference."),
+                io.Int.Input("audio_max_tokens", default=5120, min=0, max=2147483647, optional=True, tooltip="Maximum audio reference tokens before encoding fails the budget check, with 0 disabling the limit."),
+                io.Int.Input("ref_resolution", default=1024, min=256, max=2048, step=64, optional=True, tooltip="Short-edge limit in pixels before grid rounding and minimum-size handling."),
+                io.Int.Input("max_visual_tokens", default=16384, min=0, max=2147483647, step=512, optional=True, tooltip="Maximum visual reference tokens, with 0 disabling the budget."),
+                io.Combo.Input("visual_budget", options=['error', 'truncate'], default='error', optional=True, tooltip="Chooses whether to fail or truncate visual references when they exceed the token budget."),
+                io.Int.Input("folder_max_items", default=8, min=1, max=256, optional=True, tooltip="Maximum number of media files loaded from the reference folder."),
+                io.Int.Input("folder_max_edge", default=1536, min=256, max=4096, step=64, optional=True, tooltip="Maximum long edge in pixels for media loaded from the reference folder."),
+                io.String.Input("description", default='', multiline=True, optional=True, tooltip="Optional description stored with the reference and used to build prompt hints."),
+                io.String.Input("subfolder", default='characters', optional=True, tooltip='Folder inside models/refmods. Empty saves straight into models/refmods.'),
+                io.Boolean.Input("overwrite", default=True, optional=True, tooltip='Replace a file of the same name instead of failing.'),
+            ],
+            outputs=[
+                io.Custom("H3_REF_MODS").Output("mods", tooltip="Baked reference components paired with full strength for use by RefMod Apply."),
+                io.String.Output("saved_path", tooltip="Full path to the saved safetensors bundle."),
+                io.String.Output("details", tooltip="JSON summary of the bundle path, member names, kinds and token counts."),
+            ],
+            is_output_node=True,
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, folder: str = "", folder_max_items: int = 8, **_: object) -> str:
+        if not str(folder or "").strip():
+            return ""
+        return folder_change_key(folder, folder_max_items)
+
+    @classmethod
+    def execute(cls, name: str, vae: object, images: torch.Tensor | None = None,
+             video_frames: torch.Tensor | None = None, folder: str = "", audio: dict[str, object] | None = None,
+             audio_vae: object | None = None, audio_type: str = "voice", audio_max_seconds: float = 30.0,
+             audio_max_tokens: int = 5120, ref_resolution: int = 1024, max_visual_tokens: int = 16384,
+             visual_budget: str = "error", folder_max_items: int = 8, folder_max_edge: int = 1536,
+             description: str = "", subfolder: str = "characters", overwrite: bool = True
+             ) -> io.NodeOutput:
+        clean = sanitise_save_name(name)
+        sub = str(subfolder or "").strip()
+        image_refs: dict[str, torch.Tensor] = {}
+        if isinstance(images, torch.Tensor) and images.numel():
+            for i in range(images.shape[0]):
+                image_refs[f"ref_image_{i + 1}"] = images[i:i + 1]
+        video_refs: dict[str, torch.Tensor] = {}
+        if isinstance(video_frames, torch.Tensor) and video_frames.numel():
+            video_refs["ref_video_1"] = video_frames
+        folder_refs: list[torch.Tensor] = []
+        if str(folder or "").strip():
+            folder_refs, _ = load_folder(folder, folder_max_items, folder_max_edge, max_frames=240)
+        has_visual = bool(image_refs or video_refs or folder_refs)
+        if not has_visual and audio is None:
+            raise RefModError("RefMod Bake needs at least one source: images, video_frames, folder or audio")
+        if audio is not None and audio_vae is None:
+            raise RefModError("audio is connected but audio_vae is not; connect the MiniMax H3 audio VAE")
+        dest = mod_output_path(clean, sub)
+        if not overwrite and os.path.exists(dest):
+            raise RefModError(f"{dest} already exists; enable overwrite or pick another name")
+        mods: list[RefMod] = []
+        if has_visual:
+            mods.append(make_visual(f"{clean}_visual", vae, image_refs, video_refs, folder_refs,
+                                    ref_resolution=ref_resolution, max_tokens=max_visual_tokens,
+                                    budget_policy=visual_budget, description=description))
+        if audio is not None:
+            mods.append(make_audio(audio_vae, audio, f"{clean}_audio", audio_max_seconds, audio_max_tokens,
+                                   "error", description, audio_type))
+        loaded = bake_bundle(dest, clean, mods)
+        thumb = _first_frame(images) if image_refs else (
+            _first_frame(video_frames) if video_refs else (_first_frame(folder_refs[0]) if folder_refs else None))
+        write_sidecars(dest[: -len(".safetensors")], thumb, audio, audio_max_seconds)
+        lib_name = f"{sub}/{clean}" if sub else clean
+        details = json.dumps({
+            "name": clean, "file": dest, "total_tokens": sum(m.token_count for m in loaded),
+            "members": [{"name": m.name, "kind": m.kind, "tokens": m.token_count} for m in loaded],
+        }, indent=2)
+        entry = library_entry(lib_name.replace("\\", "/"), dest)
+        ui: UIPayload = {"text": [dest], "refmod_entry": [entry] if entry else []}
+        return io.NodeOutput([(m, 1.0) for m in loaded], dest, details, ui=ui)
+
+
+# --------------------------------------------------------------------------- loader / apply
+
+class JWTFRefModLoader(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRefModLoader",
+            display_name='RefMod Loader',
+            category='JezzWTF/refmod',
+            description="Load up to four RefMod files by name, each with its own strength and copy count, and output them for RefMod Apply.",
+            inputs=[
+                io.Combo.Input("mod_1", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 1, or None to leave the slot empty."),
+                io.Float.Input("strength_1", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 1, with 0 skipping the slot."),
+                io.Int.Input("copies_1", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 1, multiplying its token cost."),
+                io.Combo.Input("mod_2", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 2, or None to leave the slot empty."),
+                io.Float.Input("strength_2", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 2, with 0 skipping the slot."),
+                io.Int.Input("copies_2", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 2, multiplying its token cost."),
+                io.Combo.Input("mod_3", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 3, or None to leave the slot empty."),
+                io.Float.Input("strength_3", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 3, with 0 skipping the slot."),
+                io.Int.Input("copies_3", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 3, multiplying its token cost."),
+                io.Combo.Input("mod_4", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 4, or None to leave the slot empty."),
+                io.Float.Input("strength_4", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 4, with 0 skipping the slot."),
+                io.Int.Input("copies_4", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 4, multiplying its token cost."),
+                io.Boolean.Input("show_info", default=False, optional=True, tooltip="Logs extra details for each distinct loaded reference when enabled."),
+                io.Int.Input("max_total_tokens", default=0, min=0, max=1048576, optional=True, tooltip="Maximum total reference tokens across selected components and copies, with 0 disabling the limit."),
+                io.Float.Input("visual_strength_1", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for visual references in slot 1, combined with the slot strength."),
+                io.Float.Input("audio_strength_1", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for audio references in slot 1, combined with the slot strength."),
+                io.Combo.Input("components_1", options=['All', 'Visual', 'Audio'], default='All', optional=True, tooltip="Includes visual references, audio references or both from slot 1."),
+                io.Float.Input("visual_strength_2", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for visual references in slot 2, combined with the slot strength."),
+                io.Float.Input("audio_strength_2", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for audio references in slot 2, combined with the slot strength."),
+                io.Combo.Input("components_2", options=['All', 'Visual', 'Audio'], default='All', optional=True, tooltip="Includes visual references, audio references or both from slot 2."),
+                io.Float.Input("visual_strength_3", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for visual references in slot 3, combined with the slot strength."),
+                io.Float.Input("audio_strength_3", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for audio references in slot 3, combined with the slot strength."),
+                io.Combo.Input("components_3", options=['All', 'Visual', 'Audio'], default='All', optional=True, tooltip="Includes visual references, audio references or both from slot 3."),
+                io.Float.Input("visual_strength_4", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for visual references in slot 4, combined with the slot strength."),
+                io.Float.Input("audio_strength_4", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Multiplier for audio references in slot 4, combined with the slot strength."),
+                io.Combo.Input("components_4", options=['All', 'Visual', 'Audio'], default='All', optional=True, tooltip="Includes visual references, audio references or both from slot 4."),
+            ],
+            outputs=[
+                io.Custom("H3_REF_MODS").Output("mods", tooltip="Loaded references paired with their effective slot strengths, including requested copies."),
+                io.String.Output("prompt_hint", tooltip="Prompt hints assembled from the selected reference descriptions and concept types."),
+                io.String.Output("info", tooltip="Per-reference strengths and token counts, followed by the total token cost."),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, **_: object) -> bool:
+        return True
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs: object) -> tuple[object, ...]:
+        return slots_is_changed(kwargs)
+
+    @classmethod
+    def execute(cls, show_info: bool = False, max_total_tokens: int = 0, **kwargs: object) -> io.NodeOutput:
+        rows, hint, lines = collect_slots(kwargs, int(max_total_tokens))
+        info = "\n".join(lines)
+        log.info("RefMod Loader:\n%s", info)
+        if show_info:
+            seen: set[int] = set()
+            for m, _ in rows:
+                if id(m) not in seen:
+                    seen.add(id(m))
+                    log.info("  %s", mod_details(m))
+        return io.NodeOutput(rows, hint, info)
+
+
+class JWTFRefModApply(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFRefModApply",
+            display_name='RefMod Apply',
+            category='JezzWTF/refmod',
+            description="Inject RefMod references into MiniMax H3 conditioning, with retention, a curve over the clip, and optional scrambling of several references.",
+            inputs=[
+                io.Conditioning.Input("conditioning", tooltip="MiniMax H3 conditioning to receive the selected reference blocks."),
+                io.Combo.Input("mod_1", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 1, or None to leave the slot empty."),
+                io.Float.Input("visual_strength_1", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for visual references in slot 1, combined with the slot strength."),
+                io.Float.Input("audio_strength_1", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for audio references in slot 1, combined with the slot strength."),
+                io.Float.Input("strength_1", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 1, with 0 skipping the slot."),
+                io.Int.Input("copies_1", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 1, multiplying its token cost."),
+                io.Combo.Input("components_1", options=['All', 'Visual', 'Audio'], default='All', tooltip="Includes visual references, audio references or both from slot 1."),
+                io.Combo.Input("mod_2", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 2, or None to leave the slot empty."),
+                io.Float.Input("visual_strength_2", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for visual references in slot 2, combined with the slot strength."),
+                io.Float.Input("audio_strength_2", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for audio references in slot 2, combined with the slot strength."),
+                io.Float.Input("strength_2", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 2, with 0 skipping the slot."),
+                io.Int.Input("copies_2", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 2, multiplying its token cost."),
+                io.Combo.Input("components_2", options=['All', 'Visual', 'Audio'], default='All', tooltip="Includes visual references, audio references or both from slot 2."),
+                io.Combo.Input("mod_3", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 3, or None to leave the slot empty."),
+                io.Float.Input("visual_strength_3", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for visual references in slot 3, combined with the slot strength."),
+                io.Float.Input("audio_strength_3", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for audio references in slot 3, combined with the slot strength."),
+                io.Float.Input("strength_3", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 3, with 0 skipping the slot."),
+                io.Int.Input("copies_3", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 3, multiplying its token cost."),
+                io.Combo.Input("components_3", options=['All', 'Visual', 'Audio'], default='All', tooltip="Includes visual references, audio references or both from slot 3."),
+                io.Combo.Input("mod_4", options=combo_choices(), default=combo_choices()[0], tooltip="Selects the RefMod bundle for slot 4, or None to leave the slot empty."),
+                io.Float.Input("visual_strength_4", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for visual references in slot 4, combined with the slot strength."),
+                io.Float.Input("audio_strength_4", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for audio references in slot 4, combined with the slot strength."),
+                io.Float.Input("strength_4", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Multiplier for all included components in slot 4, with 0 skipping the slot."),
+                io.Int.Input("copies_4", default=1, min=1, max=10, tooltip="Number of times to include each selected reference in slot 4, multiplying its token cost."),
+                io.Combo.Input("components_4", options=['All', 'Visual', 'Audio'], default='All', tooltip="Includes visual references, audio references or both from slot 4."),
+                io.Float.Input("retention", default=0.85, min=0.0, max=1.0, step=0.01, tooltip="Multiplies each reference strength, with lower values blending toward a blurred latent and 0 omitting references."),
+                io.Int.Input("max_total_tokens", default=0, min=0, max=1048576, tooltip="Maximum total reference tokens across selected components and copies, with 0 disabling the limit."),
+                io.Combo.Input("curve_direction", options=list(DIRECTIONS), default='constant', tooltip="Selects which part of each temporal reference receives the most influence."),
+                io.Combo.Input("curve_shape", options=list(SHAPES), default='linear', tooltip="Easing function used to shape the strength curve over the reference."),
+                io.Float.Input("curve_value", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Scales the temporal curve and caps still-reference strength for nonconstant directions."),
+                io.Int.Input("scramble_seed", default=-1, min=-1, max=2147483647, tooltip="Seed for reordering or selecting reference blocks, with -1 preserving their original order."),
+                io.Combo.Input("scramble_mode", options=list(SCRAMBLE_MODES), default='shuffle', tooltip="Chooses whether scrambling shuffles all references or retains a subset."),
+                io.Int.Input("scramble_keep", default=1, min=1, max=80, tooltip="Number of shuffled reference blocks to retain in subset mode."),
+                io.Custom("H3_REF_MODS").Input("extra_mods", optional=True, tooltip="Additional weighted references appended to the selected slots before applying the token budget and retention."),
+            ],
+            outputs=[
+                io.Conditioning.Output("conditioning", tooltip="Conditioning with the reference blocks appended, or the original conditioning when no blocks are applied."),
+                io.String.Output("prompt_hint", tooltip="Prompt hints assembled from the selected reference descriptions and concept types."),
+                io.String.Output("info", tooltip="Reference summary with strengths, token counts and the number of injected blocks when applied."),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, **_: object) -> bool:
+        return True
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs: object) -> tuple[object, ...]:
+        return slots_is_changed(kwargs)
+
+    @classmethod
+    def execute(cls, conditioning: object, retention: float = 0.85, max_total_tokens: int = 0,
+              curve_direction: str = "constant", curve_shape: str = "linear", curve_value: float = 1.0,
+              scramble_seed: int = -1, scramble_mode: str = "shuffle", scramble_keep: int = 1,
+              extra_mods: list[Row] | None = None, **kwargs: object) -> io.NodeOutput:
+        budget = int(max_total_tokens)
+        rows, hint, lines = collect_slots(kwargs, budget)
+        if extra_mods:
+            extra = [(m, float(s)) for m, s in extra_mods]
+            rows = rows + extra
+            total = check_budget(rows, budget)
+            extra_hint = "; ".join(f"{m.concept_type}: {m.description}" for m, _ in extra if m.description)
+            hint = "; ".join(h for h in (hint, extra_hint) if h)
+            lines = lines[:-1] + [f"(extra) {m.name} [{m.kind}] strength {s:.2f} - {m.token_count} tokens"
+                                  for m, s in extra]
+            lines.append(f"total: {total} tokens" + (f" / budget {budget}" if budget > 0 else ""))
+        info = "\n".join(lines)
+        if not rows:
+            return io.NodeOutput(conditioning, hint, info)
+        out, n = apply_rows(conditioning, rows, retention, (curve_direction, curve_shape, float(curve_value)),
+                            int(scramble_seed), scramble_mode, int(scramble_keep), budget)
+        info += f"\ninjected {n} reference block(s)"
+        log.info("RefMod Apply:\n%s", info)
+        return io.NodeOutput(out, hint, info)
+
+
+# --------------------------------------------------------------------------- tails
+
+def tail_frames(images: torch.Tensor, tail_seconds: float, source_fps: float) -> torch.Tensor:
+    if not isinstance(images, torch.Tensor) or images.dim() != 4 or images.shape[0] < 2:
+        raise RefModError("tail needs at least 2 frames")
+    total = int(images.shape[0])
+    want = max(5, int(round(tail_seconds * H3_FPS)))
+    length = valid_len(want)
+    n_src = min(total, max(2, int(round(tail_seconds * source_fps))))
+    window = images[total - n_src:]
+    idx = [int(round(v)) for v in torch.linspace(0, n_src - 1, want).tolist()]
+    return window[idx][-length:]
+
+
+def tail_audio(audio: dict[str, object], tail_seconds: float) -> dict[str, object]:
+    wave = audio.get("waveform")
+    sr = audio.get("sample_rate")
+    if not isinstance(wave, torch.Tensor) or not isinstance(sr, (int, float)):
+        raise RefModError("invalid AUDIO input")
+    n = max(1, int(round(tail_seconds * float(sr))))
+    return {"waveform": wave[..., -n:], "sample_rate": sr}
+
+
+def build_tail(name: str, images: torch.Tensor, vae: object, tail_seconds: float, source_fps: float,
+               audio: dict[str, object] | None, audio_vae: object | None, audio_type: str,
+               ref_resolution: int, max_visual_tokens: int, visual_budget: str, description: str
+               ) -> tuple[list[RefMod], torch.Tensor]:
+    if audio is not None and audio_vae is None:
+        raise RefModError("audio is connected but audio_vae is not")
+    frames = tail_frames(images, tail_seconds, source_fps)
+    mods = [make_visual(f"{name}_visual", vae, {}, {"ref_video_1": frames}, [], ref_resolution=ref_resolution,
+                        max_tokens=max_visual_tokens, budget_policy=visual_budget, description=description,
+                        video_cap=int(frames.shape[0]))]
+    if audio is not None:
+        mods.append(make_audio(audio_vae, tail_audio(audio, tail_seconds), f"{name}_audio", tail_seconds + 0.5,
+                               5120, "error", description, audio_type))
+    return mods, frames
+
+
+class JWTFTailRefMod(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTailRefMod",
+            display_name='Tail RefMod',
+            category='JezzWTF/refmod',
+            inputs=[
+                io.Image.Input("images", tooltip="Source frame batch with at least two frames, sampled from the end of the clip."),
+                io.Vae.Input("vae", tooltip="MiniMax H3 video VAE used to encode the selected tail frames."),
+                io.Float.Input("tail_seconds", default=1.0, min=0.25, max=10.0, step=0.05, tooltip="Length of the source tail in seconds, resampled to the H3 frame rate and trimmed to a valid frame count."),
+                io.Float.Input("source_fps", default=24.0, min=1.0, max=120.0, step=0.5, tooltip="Source playback rate in frames per second used to locate the start of the tail."),
+                io.Float.Input("strength", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Strength assigned to each returned tail reference."),
+                io.Audio.Input("audio", optional=True, tooltip="Optional audio whose ending is cropped to the requested tail duration."),
+                io.Vae.Input("audio_vae", optional=True, tooltip="MiniMax H3 audio VAE required to encode a connected audio reference."),
+                io.Combo.Input("audio_type", options=['voice', 'singing', 'music_style', 'sound_fx', 'ambience'], default='voice', optional=True, tooltip="Concept type stored with the audio reference and used in prompt hints."),
+                io.Int.Input("ref_resolution", default=512, min=256, max=2048, step=64, optional=True, tooltip="Short-edge limit in pixels before grid rounding and minimum-size handling."),
+                io.Int.Input("max_visual_tokens", default=16384, min=0, max=2147483647, step=512, optional=True, tooltip="Maximum visual reference tokens, with 0 disabling the budget."),
+                io.Combo.Input("visual_budget", options=['truncate', 'error'], default='truncate', optional=True, tooltip="Chooses whether to trim the visual tail or fail when it exceeds the token budget."),
+                io.String.Input("description", default='', multiline=True, optional=True, tooltip="Optional description stored with the reference and used to build prompt hints."),
+                io.String.Input("save_name", default='tail_latest', optional=True, tooltip="Base name of the saved tail bundle in the RefMod tail folder."),
+            ],
+            outputs=[
+                io.Custom("H3_REF_MODS").Output("mods", tooltip="Saved visual and optional audio references paired with the requested strength."),
+                io.String.Output("info", tooltip="Summary of saved components, their token counts and the bundle path."),
+                io.Image.Output("tail_frames", tooltip="Selected and resampled tail frames before reference encoding."),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, images: torch.Tensor, vae: object, tail_seconds: float, source_fps: float, strength: float,
+            audio: dict[str, object] | None = None, audio_vae: object | None = None, audio_type: str = "voice",
+            ref_resolution: int = 512, max_visual_tokens: int = 16384, visual_budget: str = "truncate",
+            description: str = "", save_name: str = "tail_latest") -> io.NodeOutput:
+        name = sanitise_save_name(save_name)
+        mods, frames = build_tail(name, images, vae, tail_seconds, source_fps, audio, audio_vae, audio_type,
+                                  ref_resolution, max_visual_tokens, visual_budget, description)
+        dest = mod_output_path(name, TAIL_SUBFOLDER)
+        loaded = bake_bundle(dest, name, mods)
+        info = "\n".join(f"{m.name} [{m.kind}] {m.token_count} tokens" for m in loaded) + f"\nsaved {dest}"
+        return io.NodeOutput([(m, float(strength)) for m in loaded], info, frames)
+
+
+def _slot_paths(name: str) -> tuple[str, str]:
+    return mod_output_path(f"{name}_a", TAIL_SUBFOLDER), mod_output_path(f"{name}_b", TAIL_SUBFOLDER)
+
+
+def _mtime_ns(path: str) -> int:
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return -1
+
+
+def newest_slot(name: str) -> str | None:
+    a, b = _slot_paths(name)
+    ma, mb = _mtime_ns(a), _mtime_ns(b)
+    if ma < 0 and mb < 0:
+        return None
+    return a if ma >= mb else b
+
+
+def capture_target(name: str) -> str:
+    """The slot that is NOT the most recently written (it may still be memory-mapped)."""
+    a, b = _slot_paths(name)
+    newest = newest_slot(name)
+    return b if newest == a else a
+
+
+class JWTFTailCapture(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTailCapture",
+            display_name='Tail Capture',
+            category='JezzWTF/refmod',
+            description="Save the last frames of a clip so the next clip can continue from them.",
+            inputs=[
+                io.Image.Input("images", tooltip="Source frame batch with at least two frames, sampled from the end of the clip."),
+                io.Vae.Input("vae", tooltip="MiniMax H3 video VAE used to encode the selected tail frames."),
+                io.Float.Input("tail_seconds", default=1.0, min=0.25, max=10.0, step=0.05, tooltip="Length of the source tail in seconds, resampled to the H3 frame rate and trimmed to a valid frame count."),
+                io.Float.Input("source_fps", default=24.0, min=1.0, max=120.0, step=0.5, tooltip="Source playback rate in frames per second used to locate the start of the tail."),
+                io.Audio.Input("audio", optional=True, tooltip="Optional audio whose ending is cropped to the requested tail duration."),
+                io.Vae.Input("audio_vae", optional=True, tooltip="MiniMax H3 audio VAE required to encode a connected audio reference."),
+                io.Combo.Input("audio_type", options=['voice', 'singing', 'music_style', 'sound_fx', 'ambience'], default='voice', optional=True, tooltip="Concept type stored with the audio reference and used in prompt hints."),
+                io.Int.Input("ref_resolution", default=512, min=256, max=2048, step=64, optional=True, tooltip="Short-edge limit in pixels before grid rounding and minimum-size handling."),
+                io.Int.Input("max_visual_tokens", default=16384, min=0, max=2147483647, step=512, optional=True, tooltip="Maximum visual reference tokens, with 0 disabling the budget."),
+                io.Combo.Input("visual_budget", options=['truncate', 'error'], default='truncate', optional=True, tooltip="Chooses whether to trim the visual tail or fail when it exceeds the token budget."),
+                io.String.Input("description", default='', multiline=True, optional=True, tooltip="Optional description stored with the reference and used to build prompt hints."),
+                io.String.Input("save_name", default='tail_latest', optional=True, tooltip="Base name shared by the two alternating capture files and the corresponding Tail Load node."),
+            ],
+            outputs=[],
+            is_output_node=True,
+        )
+
+    @classmethod
+    def execute(cls, images: torch.Tensor, vae: object, tail_seconds: float, source_fps: float,
+            audio: dict[str, object] | None = None, audio_vae: object | None = None, audio_type: str = "voice",
+            ref_resolution: int = 512, max_visual_tokens: int = 16384, visual_budget: str = "truncate",
+            description: str = "", save_name: str = "tail_latest") -> io.NodeOutput:
+        name = sanitise_save_name(save_name)
+        mods, frames = build_tail(name, images, vae, tail_seconds, source_fps, audio, audio_vae, audio_type,
+                                  ref_resolution, max_visual_tokens, visual_budget, description)
+        dest = capture_target(name)
+        write_bundle(dest, name, mods)
+        MOD_CACHE.clear()
+        summary = (f"tail saved: {os.path.basename(dest)} - {int(frames.shape[0])} frames, "
+                   f"{sum(m.token_count for m in mods)} tokens" + (" + audio" if audio is not None else ""))
+        return io.NodeOutput(ui={"text": [summary]})
+
+
+class JWTFTailLoad(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="JWTFTailLoad",
+            display_name='Tail Load',
+            category='JezzWTF/refmod',
+            description="Read back the tail saved by Tail Capture as references for a continuing clip.",
+            inputs=[
+                io.Boolean.Input("enabled", default=True, tooltip="Loads the latest matching capture when enabled, otherwise returning an empty reference list."),
+                io.Float.Input("strength", default=1.0, min=0.0, max=1.0, step=0.01, tooltip="Strength assigned to each loaded tail reference."),
+                io.String.Input("save_name", default='tail_latest', optional=True, tooltip="Base name matching the Tail Capture node's alternating save slots."),
+            ],
+            outputs=[
+                io.Custom("H3_REF_MODS").Output("mods", tooltip="References from the newest capture with the requested strength, or an empty list when disabled or missing."),
+                io.String.Output("info", tooltip="Loaded reference details and source path, or a status message when loading is disabled or no capture exists."),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, enabled: bool = True, strength: float = 1.0, save_name: str = "tail_latest") -> str:
+        try:
+            newest = newest_slot(sanitise_save_name(save_name))
+        except RefModError:
+            newest = None
+        return f"{enabled}|{strength}|{_mtime_ns(newest) if newest else -1}"
+
+    @classmethod
+    def execute(cls, enabled: bool, strength: float, save_name: str = "tail_latest") -> io.NodeOutput:
+        if not enabled:
+            return io.NodeOutput([], "tail off")
+        newest = newest_slot(sanitise_save_name(save_name))
+        if newest is None:
+            return io.NodeOutput([], "no tail saved yet (a Tail Capture at the end of the graph writes one)")
+        mods = MOD_CACHE.load(newest)
+        info = "\n".join(f"{m.name} [{m.kind}] {m.token_count} tokens" for m in mods) + f"\nfrom {newest}"
+        return io.NodeOutput([(m, float(strength)) for m in mods], info)
+
+
+NODES = [JWTFRefModBake, JWTFRefModLoader, JWTFRefModApply, JWTFTailRefMod, JWTFTailCapture, JWTFTailLoad]

@@ -28,6 +28,7 @@ MODULES: tuple[tuple[str, str], ...] = (
     ("refresh_page", "Refresh Page"),
     ("draw_image", "Draw Image"),
     ("multi_load", "Multi Load Image"),
+    ("mask_composite", "Mask Composite"),
 )
 _ROUTES_FLAG = "_jezzwtf_utility_core_routes"
 

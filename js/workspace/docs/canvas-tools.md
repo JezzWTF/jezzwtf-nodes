@@ -6,6 +6,8 @@ Small helpers for tidying a graph. They work on the selected nodes (Tidy uses ev
 
 Lays the nodes out in columns, left to right, by how far each is from the start of the chain: sources first, their consumers next, and so on. Within a column nodes sit in the order of the nodes feeding them, so wires cross as little as practical. The layout keeps the top-left corner of the selection where it was.
 
+Pinned nodes stay where they are and are excluded from the layout, including its top-left anchor. If fewer than two unpinned nodes remain in the target set, Tidy does nothing.
+
 ## Group selected nodes (Alt+Shift+G)
 
 Draws a group box around the selection with a little padding and room for the title.

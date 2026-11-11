@@ -80,6 +80,47 @@ def test_tidy_survives_cycles_and_foreign_links() -> None:
     assert run_js("return G.tidyByDependency([], []);") == {}
 
 
+@pytest.mark.parametrize("selection, moves", [
+    ([], True),              # whole workflow
+    ([1, 2, 3, 4], True),    # selection containing both forms of pin state
+    ([3], True),             # one selected node still targets the whole workflow
+    ([1, 3], False),         # filtering pins must not expand the selection
+    ([3, 4], False),         # entirely pinned selection
+    ([1, 2], True),          # unpinned selection still tidies normally
+])
+def test_tidy_command_leaves_pins_in_place(selection: list[int], moves: bool) -> None:
+    module = (JS / "canvas_tools" / "canvas_tools.js").as_uri()
+    out = run_js(f"""
+      const {{ readFileSync }} = process.getBuiltinModule('node:fs');
+      const {{ runInNewContext }} = process.getBuiltinModule('node:vm');
+      const source = readFileSync(new URL({json.dumps(module)}), 'utf8').replace(/^import .*;$/gm, '');
+      const nodes = [
+        {{ id: 1, pos: [100, 200], size: [120, 60] }},
+        {{ id: 2, pos: [900, 800], size: [100, 60], flags: {{ pinned: false }}, inputs: [{{ link: 1 }}, {{ link: 2 }}] }},
+        {{ id: 3, pos: [-1000.5, -2000.5], size: [500, 400], flags: {{ pinned: true }} }},
+        {{ id: 4, pos: [-500.5, -800.5], size: [300, 200], pinned: true, flags: {{ collapsed: true }} }},
+      ];
+      let extension, changes = 0, redraws = 0;
+      const app = {{
+        registerExtension: value => {{ extension = value; }},
+        canvas: {{ selected_nodes: Object.fromEntries({json.dumps(selection)}.map(id => [id, nodes[id - 1]])) }},
+        graph: {{
+          _nodes: nodes,
+          links: {{ 1: {{ origin_id: 1 }}, 2: {{ origin_id: 3 }} }},
+          change: () => changes++, setDirtyCanvas: () => redraws++,
+        }},
+      }};
+      runInNewContext(source, {{ ...G, app, getLink: (graph, id) => graph.links[id] }});
+      extension.commands.find(c => c.id === 'JezzWTF.Canvas.Tidy').function();
+      return {{ positions: nodes.map(n => n.pos), changes, redraws }};
+    """)
+    assert out["positions"] == [
+        [100, 200], [290, 200] if moves else [900, 800],
+        [-1000.5, -2000.5], [-500.5, -800.5],
+    ]
+    assert out["changes"] == out["redraws"] == int(moves)
+
+
 def test_group_rect_pads_with_a_title_bar() -> None:
     assert run_js(BOXES + "return G.groupRect([b(1, 100, 100, 50, 50), b(2, 200, 150, 100, 100)], { pad: 10, title: 30 });") == \
         {"x": 90, "y": 60, "w": 220, "h": 200}

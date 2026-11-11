@@ -34,7 +34,8 @@ const targets = (min = 2) => {
 };
 
 function tidy() {
-  const nodes = targets(2);
+  // Resolve the selection first so excluding pins cannot fall back to the whole graph.
+  const nodes = targets(2).filter((n) => !n.pinned && !n.flags?.pinned);
   if (nodes.length < 2) return;
   const ids = new Set(nodes.map((n) => n.id));
   const links = [];

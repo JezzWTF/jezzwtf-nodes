@@ -1,7 +1,7 @@
 [project]
 name = "jezzwtf-nodes"
 description = "Quality-of-life nodes for ComfyUI: Compare videos, character chat and cards, MiniMax H3 RefMod, optimised GIFs, run timer, paste stack, and plenty more"
-version = "1.1.1"
+version = "1.2.0"
 license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.10"

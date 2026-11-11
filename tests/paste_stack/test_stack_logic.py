@@ -176,6 +176,57 @@ def test_node_accepts_image() -> None:
     assert out == [True, True, False, False, False, False, False]
 
 
+@pytest.mark.parametrize("surface, expected", [
+    ("canvas", 7), ("vue", 7), ("widget", 7),
+    ("dialog", None), ("foreign-node", None), ("outside", None),
+    ("collapsed", None), ("output", None), ("missing-node", None),
+])
+def test_image_drop_target(surface: str, expected: int | None) -> None:
+    module = LOGIC.with_name("image_drop.js").as_uri()
+    out = run_js(f"""
+      const {{ imageNodeAtPoint }} = await import({json.dumps(module)});
+      const surface = {json.dumps(surface)};
+      const node = {{ id: 7, type: surface === 'output' ? 'LoadImageOutput' : 'LoadImage',
+        flags: {{ collapsed: surface === 'collapsed' }}, widgets: [{{name: 'image', type: 'combo'}}] }};
+      const queries = [];
+      const graph = {{
+        getNodeOnPos(x, y) {{ queries.push([x, y]); return node; }},
+        getNodeById(id) {{ queries.push(id); return id === '7' ? node : null; }},
+      }};
+      const overlay = {{ getAttribute: () => surface === 'widget' ? null : surface === 'missing-node' ? '8' : '7' }};
+      const element = {{
+        getBoundingClientRect: () => ({{left: 100, top: 50, right: 1100, bottom: 850}}),
+        parentElement: {{ contains: el => el === overlay && surface !== 'foreign-node' }},
+      }};
+      const domSurfaces = ['vue', 'widget', 'foreign-node', 'collapsed', 'output', 'missing-node'];
+      const hit = surface === 'canvas' ? element : {{ closest: () => domSurfaces.includes(surface) ? overlay : null }};
+      // A subgraph is open; the root graph must never receive the lookup.
+      const root = {{ getNodeOnPos() {{ throw new Error('looked in root graph'); }} }};
+      const canvas = {{ canvas: element, graph, ds: {{ scale: 2, offset: [-20, 10] }} }};
+      const found = imageNodeAtPoint(canvas, root, surface === 'outside' ? 50 : 300, 250,
+        {{ elementFromPoint: () => hit }});
+      return {{ id: found?.id ?? null, queries }};
+    """)
+    assert out["id"] == expected
+    if surface in ("canvas", "widget"):
+        assert out["queries"] == [[120, 90]]
+    if surface in ("dialog", "foreign-node", "outside"):
+        assert out["queries"] == []
+
+
+def test_image_drop_without_canvas_and_with_legacy_graph() -> None:
+    module = LOGIC.with_name("image_drop.js").as_uri()
+    assert run_js(f"""
+      const {{ imageNodeAtPoint }} = await import({json.dumps(module)});
+      const node = {{id: 1, widgets: [{{name: 'image', type: 'combo'}}]}};
+      const element = {{getBoundingClientRect: () => ({{left: 0, top: 0, right: 500, bottom: 500}})}};
+      const graph = {{getNodeOnPos: () => node}};
+      const doc = {{elementFromPoint: () => element}};
+      const canvas = {{canvas: element, ds: {{scale: 1, offset: [0, 0]}}}};
+      return [imageNodeAtPoint(null, graph, 20, 20, doc), imageNodeAtPoint(canvas, graph, 20, 20, doc)?.id];
+    """) == [None, 1]
+
+
 def test_age_size_and_id_formatting() -> None:
     out = run_js(
         """

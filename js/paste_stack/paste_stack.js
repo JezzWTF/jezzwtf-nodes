@@ -2,9 +2,10 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { createBackdrop } from "./backdrop.js";
+import { imageNodeAtPoint } from "./image_drop.js";
 import {
   LIMITS, base64ToBytes, classifyFile, clamp, findDuplicate, fingerprint, formatSize, imageMimeFromName,
-  looksLikeImagePath, makeId, moveInArray, nextTopOrd, nodeAcceptsImage, normalizeLimit, normalizeOrder,
+  looksLikeImagePath, makeId, moveInArray, nextTopOrd, normalizeLimit, normalizeOrder,
   pickEvictions, planMove, refusalFor, relativeAge, safeUploadName, widgetValueFrom,
 } from "./stack_logic.js";
 
@@ -812,14 +813,7 @@ async function createWidget(settings) {
 
   // ---- card drag: reorder or drop on a Load Image node
   function nodeUnderPointer(x, y) {
-    const canvas = app.canvas?.canvas;
-    if (!canvas || document.elementFromPoint(x, y) !== canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const ds = app.canvas.ds;
-    const gx = (x - rect.left) / ds.scale - ds.offset[0];
-    const gy = (y - rect.top) / ds.scale - ds.offset[1];
-    const node = app.graph?.getNodeOnPos?.(gx, gy);
-    return nodeAcceptsImage(node) ? node : null;
+    return imageNodeAtPoint(app.canvas, app.graph, x, y);
   }
 
   function showOutline(node) {
@@ -954,9 +948,12 @@ async function createWidget(settings) {
     cancelDrag();
   }
 
-  function finishDrag() {
+  function finishDrag(e) {
     const d = drag;
     if (!d.active) { teardownDrag(); return; }
+    d.px = e.clientX;
+    d.py = e.clientY;
+    updateDrag();
     suppressClickUntil = performance.now() + 60;
     const { it, node, reorder, slot } = d;
     teardownDrag();
@@ -984,7 +981,7 @@ async function createWidget(settings) {
       w.value = value;
       try { w.callback?.(value, app.canvas, node); } catch { /* best-effort preview refresh */ }
       try { node.onWidgetChanged?.(w.name, value, old, w); } catch { /* best effort */ }
-      try { app.graph?.change?.(); } catch { /* best effort */ }
+      try { (node.graph ?? app.canvas?.graph ?? app.graph)?.change?.(); } catch { /* best effort */ }
       app.canvas?.setDirty?.(true, true);
       say(`Loaded into ${node.title || node.type}.`);
     } catch (err) {

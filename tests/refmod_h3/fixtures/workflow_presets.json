@@ -1,0 +1,15 @@
+{
+  "reviewed": "2026-11-12",
+  "source_repository": "Comfy-Org/workflow_templates",
+  "source_commit": "a8bc07a76478dfada740fa8fa49ac87be1bff519",
+  "families": {
+    "qwen21": {"template": "image_qwen_image_2_1_image_edit.json", "model": "qwen_image_2.1_int8_convrot.safetensors", "clip": "qwen3vl_8b_int8_convrot.safetensors", "clip_type": "qwen_image", "vae": "qwen_image_2.1_vae_bf16.safetensors", "steps": 25, "cfg": 1, "scheduler": "simple"},
+    "fibo2": {"template": "image_fibo2_edit_dev_pe.json", "model": "fibo2_dev_int8_convrot.safetensors", "clip": "qwen3vl_4b_bf16.safetensors", "clip_type": "fibo2", "vae": "flux2-vae.safetensors", "steps": 50, "cfg": 5, "scheduler": "simple"},
+    "flux3": {"template": "image_flux3_klein_image_edit.json", "model": "flux3-image-klein-base-int8-convrot.safetensors", "clip": "qwen3vl_4b_int8_convrot.safetensors", "clip_type": "flux3", "vae": "flux2-vae.safetensors", "steps": 50, "cfg": 1, "scheduler": "simple"},
+    "moss_image": {"template": "image_moss_image_edit.json", "model": "moss_image_sft_int8_convrot.safetensors", "clip": "qwen3.5_9b_w4a8_gptq.safetensors", "clip_type": "moss_image", "vae": "flux2-vae_small.safetensors", "steps": 30, "cfg": 4, "scheduler": "normal", "lora": "moss_image_edit_lora_rank_64_bf16.safetensors", "edit_format": "Moss-Image-Edit"},
+    "krea2": {"template": "image_krea2_turbo_int8_image_style_reference.json", "model": "krea2_turbo_int8_convrot.safetensors", "clip": "qwen3vl_4b_fp8_scaled.safetensors", "clip_type": "krea2", "vae": "qwen_image_vae.safetensors", "steps": 8, "cfg": 1, "scheduler": "simple", "lora": "krea2_style_reference.safetensors", "edit_format": "Krea2 style reference"},
+    "flux_kontext": {"template": "flux_kontext_dev_basic.json", "model": "flux1-dev-kontext_fp8_scaled.safetensors", "clip": "clip_l.safetensors", "clip_2": "t5xxl_fp8_e4m3fn_scaled.safetensors", "clip_type": "flux", "vae": "ae.safetensors", "steps": 20, "cfg": 1, "scheduler": "simple", "guidance": 2.5},
+    "flux2": {"template": "image_flux2_klein_image_edit_4b_base.json", "model": "flux-2-klein-base-4b.safetensors", "source_model": "flux-2-klein-base-4b-fp8.safetensors", "clip": "qwen_3_4b.safetensors", "clip_type": "flux2", "vae": "flux2-vae.safetensors", "source_vae": "full_encoder_small_decoder.safetensors", "steps": 20, "cfg": 5, "scheduler": "Flux2Scheduler"},
+    "ltxv": {"template": "ltxv_image_to_video.json", "model": "ltx-video-2b-v0.9.5.safetensors", "clip": "t5xxl_fp16.safetensors", "clip_type": "ltxv", "vae": "checkpoint output 2", "steps": 30, "cfg": 3, "scheduler": "LTXVScheduler"}
+  }
+}

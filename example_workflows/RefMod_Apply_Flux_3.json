@@ -1,0 +1,669 @@
+{
+  "id": "1d387dfa-a58f-5ee6-8d0d-433572ab4458",
+  "revision": 0,
+  "last_node_id": 10,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        80
+      ],
+      "size": [
+        420,
+        720
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup required \u00b7 select models and a saved bundle",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Flux 3 Klein Base \u00b7 use a saved RefMod\n\n1. Run RefMod_Bake_Image_Families.json first, with model=flux3 and the matching VAE.\n2. The loaders name the exact checkpoint variant, text encoder and VAE this preset targets. Install those files or their matching precision variants.\n3. In Image RefMod Apply, select flux3/example_character (or your own bundle). Model is auto (from refmod). Leaving the picker on None stops execution until a bundle is chosen. Refresh node definitions (R) after creating a bundle if it is not listed.\n4. Edit the prompt, then queue. References condition the result; identity, style and edit fidelity depend on the model and task.\n\n## Settings\n\nSampler values are starting points, not universal presets. Use the settings recommended for your exact checkpoint, especially for distilled models. Baked references must use the same VAE family as generation.\n\nOptional: combine refmod_2/refmod_3 from the SAME family. ref_strength sets how long image references are active, not their pixel amplitude."
+      ],
+      "widgets_values_named": {
+        "text": "# Flux 3 Klein Base \u00b7 use a saved RefMod\n\n1. Run RefMod_Bake_Image_Families.json first, with model=flux3 and the matching VAE.\n2. The loaders name the exact checkpoint variant, text encoder and VAE this preset targets. Install those files or their matching precision variants.\n3. In Image RefMod Apply, select flux3/example_character (or your own bundle). Model is auto (from refmod). Leaving the picker on None stops execution until a bundle is chosen. Refresh node definitions (R) after creating a bundle if it is not listed.\n4. Edit the prompt, then queue. References condition the result; identity, style and edit fidelity depend on the model and task.\n\n## Settings\n\nSampler values are starting points, not universal presets. Use the settings recommended for your exact checkpoint, especially for distilled models. Baked references must use the same VAE family as generation.\n\nOptional: combine refmod_2/refmod_3 from the SAME family. ref_strength sets how long image references are active, not their pixel amplitude."
+      }
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        880
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load Flux 3 Klein Base diffusion model",
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "flux3-image-klein-base-int8-convrot.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "flux3-image-klein-base-int8-convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1050
+      ],
+      "size": [
+        360,
+        150
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load Flux 3 Klein Base text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3vl_4b_int8_convrot.safetensors",
+        "flux3",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+        "type": "flux3",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        40,
+        1280
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load matching VAE",
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "flux2-vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        500,
+        80
+      ],
+      "size": [
+        380,
+        270
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Prompt \u00b7 describe the new scene",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A portrait of the reference character in a sunlit greenhouse, natural light, detailed clothing."
+      ],
+      "widgets_values_named": {
+        "text": "A portrait of the reference character in a sunlit greenhouse, natural light, detailed clothing."
+      }
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        500,
+        420
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative prompt",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 7,
+      "type": "JWTFUnifiedRefModApply",
+      "pos": [
+        940,
+        80
+      ],
+      "size": [
+        470,
+        1050
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 3,
+          "shape": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 4,
+          "shape": 7
+        },
+        {
+          "name": "extra_image",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "latent_in",
+          "type": "LATENT",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            7
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            8
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Choose your saved Flux 3 Klein Base RefMod",
+      "properties": {
+        "Node name for S&R": "JWTFUnifiedRefModApply"
+      },
+      "widgets_values": [
+        "auto (from refmod)",
+        "None",
+        "",
+        "",
+        "None",
+        "None",
+        1024,
+        "keep aspect (resolution)",
+        1.0,
+        true,
+        "ai-toolkit (kv_cache off)",
+        0,
+        0.8
+      ],
+      "widgets_values_named": {
+        "model": "auto (from refmod)",
+        "refmod_1": "None",
+        "prompt": "",
+        "negative_prompt": "",
+        "refmod_2": "None",
+        "refmod_3": "None",
+        "extra_image_resolution": 1024,
+        "extra_image_scale": "keep aspect (resolution)",
+        "ref_strength": 1.0,
+        "ref_on_negative": true,
+        "edit_format": "ai-toolkit (kv_cache off)",
+        "latent_idx": 0,
+        "guide_strength": 0.8
+      }
+    },
+    {
+      "id": 8,
+      "type": "KSampler",
+      "pos": [
+        1470,
+        80
+      ],
+      "size": [
+        360,
+        500
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 6
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 7
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Sample with the saved references",
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        42,
+        "fixed",
+        50,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "fixed",
+        "steps": 50,
+        "cfg": 1.0,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0
+      }
+    },
+    {
+      "id": 9,
+      "type": "VAEDecode",
+      "pos": [
+        1890,
+        80
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 9
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Decode the generated result",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 10,
+      "type": "SaveImage",
+      "pos": [
+        2260,
+        80
+      ],
+      "size": [
+        400,
+        500
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Save image",
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "refmods/flux3"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmods/flux3"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      3,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      5,
+      0,
+      7,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      4,
+      6,
+      0,
+      7,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      2,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      7,
+      1,
+      8,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      7,
+      2,
+      8,
+      3,
+      "LATENT"
+    ],
+    [
+      9,
+      8,
+      0,
+      9,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      4,
+      0,
+      9,
+      1,
+      "VAE"
+    ],
+    [
+      11,
+      9,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Setup and matching model components",
+      "bounding": [
+        20,
+        20,
+        460,
+        1410
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Prompt conditioning",
+      "bounding": [
+        480,
+        20,
+        420,
+        1110
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "4. Apply the saved references",
+      "bounding": [
+        920,
+        20,
+        510,
+        1150
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "5. Sample",
+      "bounding": [
+        1450,
+        20,
+        400,
+        610
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "6. Decode and save",
+      "bounding": [
+        1870,
+        20,
+        830,
+        650
+      ],
+      "color": "#49636b",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "flux3",
+      "purpose": "apply",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

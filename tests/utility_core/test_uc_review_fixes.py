@@ -156,6 +156,8 @@ def test_scan_route_is_loopback_only_and_capped(tmp_path: Path, monkeypatch: pyt
 # ---------------------------------------------------------------- 3-7. timer server
 
 def test_timer_routes_state_reset_arm(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr(timer.time, "time", lambda: clock[0])
     runs = timer.TimerRuns()
     monkeypatch.setattr(timer, "RUNS", runs)
     monkeypatch.setattr(timer, "queue_busy", lambda: False)
@@ -172,7 +174,8 @@ def test_timer_routes_state_reset_arm(monkeypatch: pytest.MonkeyPatch) -> None:
     call(routes.handlers["/jezzwtf/timer/reset"], FakeRequest(raw="[" * 100000))  # hostile body: no crash
     assert runs.snapshot() == {}  # unparseable body keeps the old "reset everything" meaning
     call(routes.handlers["/jezzwtf/timer/arm"], FakeRequest())
-    assert runs.tick("n", 2, now=time.time() + 5)[0].started_at < time.time()
+    clock[0] += 5
+    assert runs.tick("n", 2, now=clock[0])[0].started_at == 1000.0
 
 
 # ---------------------------------------------------------------- 8. set / get scope

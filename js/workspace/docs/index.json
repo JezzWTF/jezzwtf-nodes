@@ -63,6 +63,12 @@
           "keywords": "match size get image draw image multi load aspect mask"
         },
         {
+          "id": "image-tools",
+          "title": "Image Compare, Image Saver and Mask Editor",
+          "file": "image-tools.md",
+          "keywords": "image compare wipe blend difference mask editor paint erase smart squeeze save png jpeg webp avif ssim compression"
+        },
+        {
           "id": "dataset",
           "title": "Dataset captioning nodes",
           "file": "dataset.md",

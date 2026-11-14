@@ -74,6 +74,9 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 | Draw Image | Layered sketch pad that loads like Load Image, with pressure, undo and zoom |
 | Multi Load Image | Up to 16 image slots, each with its own output |
 | Mask Composite | Combine two masks at an offset with replace, add, subtract, multiply, min, max, difference or xor, plus opacity, inversion and a soft edge |
+| Mask Editor | Paint or erase masks against an image, with undo, zoom, saved paintings, inversion and feathering |
+| Image Compare | Wipe, blend, difference, toggle or mask comparison, with batch previews and MAE/PSNR metrics |
+| Image Saver (Smart Squeeze) | Save PNG, WebP, JPEG, AVIF or TIFF, with a quality-targeted compression search and an encoding report |
 | Gallery Load | Pick one or many images in a floating gallery window (input or output folders, folders, search) and load them as a batch |
 | Switch | Pick one of two inputs with a true/false switch; the output takes the connected type and only the chosen side is computed |
 | Route | Send one input to the true or the false output; nodes on the other output are skipped |

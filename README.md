@@ -143,7 +143,7 @@ Category `JezzWTF/audio`.
 
 | Node | What it does |
 |---|---|
-| Audio Loader | Load an audio file from the input folder (subfolders included) with an upload button, a player, trim and mono mix |
+| Audio Loader | Load or upload audio with a player, waveform selection and scrubbing, trim fields and mono mix |
 | Album Cover | Embed an image as the cover art of an mp3, flac or m4a file, with optional title, artist and album tags |
 
 ## Video

@@ -7,7 +7,7 @@ import { api, chain, clamp, fetchJson, findWidget, h, injectCss, onWidget, setWi
 const KINDS = { JWTFUnifiedRefModBake: "bake", JWTFUnifiedRefModApply: "apply" };
 const TOKEN_CAP = 16384;
 const POLL_MS = 15000;
-const OPTIONAL_APPLY = ["extra_image_scale", "ref_strength", "ref_on_negative", "frame_idx", "strength"];
+const OPTIONAL_APPLY = ["extra_image_scale", "ref_strength", "ref_on_negative", "frame_idx", "strength", "edit_format", "latent_idx", "guide_strength"];
 const AUTO = "auto (from refmod)";
 
 injectCss("jezzwtf-unified-panel", `

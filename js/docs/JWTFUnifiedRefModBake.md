@@ -1,12 +1,12 @@
 # Image RefMod Bake
 
-References for Qwen Image 2.1, Fibo 2 and Flux 3.
+References for Qwen Image 2.1, Fibo 2, Flux 3, Flux.2, Flux Kontext, MOSS and Krea edit LoRAs, plus saved LTX image guides.
 
 ## Inputs
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `model` | Chooses which model family will encode the reference images. (default: `qwen21`) | COMBO | Yes | `"qwen21"`<br>`"fibo2"`<br>`"flux3"` |
+| `model` | Chooses which model family will encode the reference images. (default: `qwen21`) | COMBO | Yes | `"qwen21"`<br>`"fibo2"`<br>`"flux3"`<br>`"moss_image"`<br>`"krea2"`<br>`"flux_kontext"`<br>`"flux2"`<br>`"ltxv"` |
 | `images` | First image batch to encode, with each frame counted as one reference. | IMAGE | Yes |  |
 | `name` | Base filename of the reference bundle. (default: my_character) | STRING | Yes |  |
 | `resolution` | Square root of the target pixel area for reference encoding, with 0 using source dimensions before model-specific rounding. (default: 1024) | INT | Yes | 0 to 4096 (step 16) |

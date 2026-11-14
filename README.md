@@ -130,7 +130,9 @@ A RefMod is a `.safetensors` file of reference latents (portraits, a short clip,
 |---|---|
 | RefMod Bake (Character) / Loader / Apply | Bake references into a file, load it, and apply it with strength, curves and scramble |
 | Tail RefMod / Capture / Load | The same idea for continuing a clip from its tail |
-| Image RefMod Bake / Apply | References for Qwen Image 2.1, Fibo 2 and Flux 3 |
+| Image RefMod Bake / Apply | References for Qwen Image 2.1, Fibo 2, Flux 3, Flux.2, Flux Kontext, MOSS and Krea edit LoRAs, plus saved LTX image guides |
+| H3 Clip Doctor | Check H3 latent shapes, frame mapping and decoded media; optionally repair media size, duration and FPS metadata |
+| Reference Audition / Save Audition Selection | Compare a full RefMod bundle against individual omissions with fixed prompts, seed and target; inspect a labeled contact sheet, then save chosen references as a new bundle |
 | Refmod Character Card Baker | Put a character card into a refmod header, saved to `models/refmods` |
 | MiniMax H3 Image Edit | One-node H3 image edit |
 | H3 Upscale Picker | Same-scale target sizes for the H3 latent upscaler |

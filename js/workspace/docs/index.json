@@ -170,7 +170,7 @@
           "id": "refmod-more",
           "title": "Tail and Image RefMod",
           "file": "refmod-more.md",
-          "keywords": "tail capture load unified qwen fibo flux"
+            "keywords": "tail capture load unified qwen fibo flux reference audition selection comparison ablation ltx h3"
         },
         {
           "id": "h3-generate",

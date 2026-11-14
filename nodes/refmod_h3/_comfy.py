@@ -5,11 +5,13 @@ ComfyUI modules are only ever imported lazily inside functions.
 """
 from __future__ import annotations
 
+import hashlib
 import importlib
 import logging
 import os
 import tempfile
 from types import ModuleType
+from typing import BinaryIO
 
 import torch
 
@@ -218,3 +220,11 @@ def call_node(cls: type, **kwargs: object) -> tuple[object, ...]:
     if isinstance(out, (tuple, list)):
         return tuple(out)
     return (out,)
+
+
+def file_sha256(stream: BinaryIO) -> "hashlib._Hash":
+    """SHA-256 of an open binary stream; stands in for hashlib.file_digest, which needs Python 3.11."""
+    hasher = hashlib.sha256()
+    while chunk := stream.read(1 << 20):
+        hasher.update(chunk)
+    return hasher

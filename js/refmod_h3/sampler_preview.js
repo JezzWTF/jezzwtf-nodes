@@ -2,7 +2,8 @@
 // graphs, phase-coloured progress bar and a help popover. Listens to `kj_preview_override`
 // (the preview wrapper's event), `jezzwtf.uk_phase`, core `progress` and `execution_start`.
 import { app } from "../../../scripts/app.js";
-import { api, chain, clamp, findWidget, h, injectCss, sameNode, setWidgetVisible } from "./_shared.js";
+import { api, chain, clamp, findWidget, h, injectCss, onWidget, sameNode, setWidgetVisible } from "./_shared.js";
+import { samplerWidgetVisibility } from "./sampler_controls.js";
 
 const NODES = new Set(["JWTFUltimateKSampler", "JWTFH3KSampler"]);
 const PREVIEW_EVENT = "kj_preview_override";
@@ -340,11 +341,10 @@ function setCollapsed(panel, on) {
     redraw(panel);
 }
 
-function applyH3Visibility(node) {
-    if (node.comfyClass !== "JWTFH3KSampler") return;
-    const linked = (n) => !!node.inputs?.find((i) => i.name === n && i.link != null);
-    setWidgetVisible(node, findWidget(node, "sampler_name"), !linked("sampler"));
-    setWidgetVisible(node, findWidget(node, "seed"), !linked("noise"));
+function applySamplerVisibility(node) {
+    for (const [name, visible] of Object.entries(samplerWidgetVisibility(node))) {
+        setWidgetVisible(node, findWidget(node, name), visible);
+    }
 }
 
 function drawHelpBadge(node, ctx) {
@@ -382,7 +382,8 @@ app.registerExtension({
             });
             w.serialize = false;
             this.setSize([Math.max(DEFAULT_SIZE[0], this.size[0]), Math.max(DEFAULT_SIZE[1], this.size[1])]);
-            applyH3Visibility(this);
+            applySamplerVisibility(this);
+            onWidget(findWidget(this, "sampler_name"), () => applySamplerVisibility(this));
             replayStart(panel);
             if (panel.collapsed()) { panel.el.classList.add("collapsed"); panel.x.textContent = "▢"; }
             requestAnimationFrame(() => redraw(panel));
@@ -392,9 +393,9 @@ app.registerExtension({
             if (!p) return;
             p.graphH = clamp(this.properties?.[KEY_PANEL_H] ?? p.graphH, 60, 400);
             p.el.classList.toggle("collapsed", p.collapsed());
-            applyH3Visibility(this);
+            applySamplerVisibility(this);
         });
-        chain(proto, "onConnectionsChange", function () { applyH3Visibility(this); });
+        chain(proto, "onConnectionsChange", function () { applySamplerVisibility(this); });
         chain(proto, "onResize", function () { const p = this._jzPanel; if (p) requestAnimationFrame(() => redraw(p)); });
         chain(proto, "onRemoved", function () { if (this._jzPanel) panels.delete(this._jzPanel); });
         chain(proto, "onExecuted", function (message) {

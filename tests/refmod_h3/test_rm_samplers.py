@@ -107,7 +107,7 @@ def test_node_ids_prefer_display_id() -> None:
 def test_ultimate_interface() -> None:
     cls = samplers.JWTFUltimateKSampler
     spec = legacy_spec(cls)
-    assert list(spec["required"]) == ["model", "positive", "latent_image", "sampler_name", "scheduler", "steps",
+    assert list(spec["required"]) == ["latent_image", "sampler_name", "scheduler", "steps",
                                       "steps_to_run", "cfg", "cfg_enabled", "denoise", "seed", "eta",
                                       "sampler_mode", "bongmath", "decode", "tiled_decode", "preview_fps"]
     req = spec["required"]
@@ -116,7 +116,7 @@ def test_ultimate_interface() -> None:
     assert eta.pop("tooltip")
     assert eta == {"default": 0.5, "min": -100.0, "max": 100.0, "step": 0.01}
     assert req["sampler_mode"][0] == ["standard", "unsample", "resample"] and req["bongmath"][1]["default"] is True
-    assert {"negative", "vae", "audio_vae", "sigmas", "options", "preview", "preview_max_res", "preview_frames",
+    assert {"model", "positive", "noise", "guider", "sampler", "negative", "vae", "audio_vae", "sigmas", "options", "preview", "preview_max_res", "preview_frames",
             "preview_jpeg_quality", "preview_tiny_vae"} <= set(spec["optional"])
     assert spec["hidden"] == {"unique_id": "UNIQUE_ID", "dynprompt": "DYNPROMPT"}
     assert tuple(cls.RETURN_NAMES) == ("latent", "denoised", "image", "audio") and cls.OUTPUT_NODE and cls.CATEGORY == "JezzWTF/sampling"
@@ -327,3 +327,111 @@ def test_widget_sigmas_zero_denoise_is_a_noop(monkeypatch: pytest.MonkeyPatch) -
     out = samplers.widget_sigmas(model, "beta", 20, 0.0)
     assert out.numel() == 0 and calls == []  # was ~3e7 sigmas
     assert samplers.widget_sigmas(model, "beta", 4, 0.5).shape[-1] == 5 and calls == [8]
+
+
+def test_ultimate_accepts_a_ready_guider_without_model_or_conditioning(rec, events):
+    guider, noise, sampler = object(), object(), object()
+    sigmas = torch.linspace(1, 0, 6)
+    run_ultimate(model=None, positive=None, guider=guider, noise=noise, sampler=sampler,
+                 sigmas=sigmas, scheduler="none", denoise=0, steps_to_run=2)
+    assert rec.names == ["SamplerCustomAdvanced"]
+    used = rec.kwargs("SamplerCustomAdvanced")
+    assert used["guider"] is guider and used["noise"] is noise and used["sampler"] is sampler
+    assert torch.equal(used["sigmas"], sigmas[:3])  # explicit sigmas win over denoise=0
+
+
+def test_ultimate_custom_noise_and_sampler_override_only_their_own_widgets(rec, events):
+    run_ultimate(noise="external-noise", sampler="external-sampler", negative=[["n"]])
+    assert rec.names == ["CFGGuider", "SamplerCustomAdvanced"]
+    used = rec.kwargs("SamplerCustomAdvanced")
+    assert used["noise"] == "external-noise" and used["sampler"] == "external-sampler"
+
+
+def test_ultimate_validates_conditionally_required_connections(rec, events):
+    with pytest.raises(RefModError, match="connect a model or a guider"):
+        run_ultimate(model=None)
+    with pytest.raises(RefModError, match="positive"):
+        run_ultimate(positive=None)
+    with pytest.raises(RefModError, match="needs sigmas"):
+        run_ultimate(model=None, positive=None, guider=object())
+    assert not rec.calls
+
+
+def test_cfg_zero_remains_numeric_and_the_toggle_selects_positive_only(rec, events):
+    run_ultimate(cfg=0, negative=[["n"]], sigmas=torch.linspace(1, 0, 5))
+    assert "CFGGuider" in rec.names and rec.kwargs("CFGGuider")["cfg"] == 0
+    rec.calls.clear()
+    run_ultimate(cfg=0, cfg_enabled=False, negative=[["n"]], sigmas=torch.linspace(1, 0, 5))
+    assert "BasicGuider" in rec.names and "CFGGuider" not in rec.names
+
+
+@pytest.mark.parametrize("port", ["noise", "guider", "sampler"])
+def test_res4lyf_rejects_unsupported_external_inputs(port, rec, events):
+    with pytest.raises(RefModError, match="RES4LYF cannot use external"):
+        run_ultimate(sampler_name="clown: res_2m", **{port: object()})
+    assert not rec.calls
+
+
+@pytest.mark.parametrize("node", [samplers.JWTFUltimateKSampler, samplers.JWTFH3KSampler])
+@pytest.mark.parametrize("attribute", samplers.GUIDER_MODEL_ATTRS)
+def test_preview_rebinds_the_discovered_guider_attribute(node, attribute, monkeypatch, rec, events):
+    class Patcher:
+        def clone(self):
+            return Patcher()
+        def add_wrapper_with_key(self, *args):
+            pass
+    original, wrapped = Patcher(), Patcher()
+    guider = types.SimpleNamespace(**{attribute: original})
+    monkeypatch.setattr(samplers, "attach_preview", lambda *args: wrapped)
+    kwargs = dict(latent_image=LATENT, sampler_name="euler", scheduler="none", steps=8,
+                  steps_to_run=-1, denoise=1, seed=4, decode=False, tiled_decode=False,
+                  preview_fps=12, guider=guider, sigmas=torch.linspace(1, 0, 9), preview=True)
+    run_node(node, **kwargs)
+    used = rec.kwargs("SamplerCustomAdvanced")["guider"]
+    assert used is not guider and getattr(used, attribute) is wrapped
+    assert getattr(guider, attribute) is original
+    if attribute != "model_patcher":
+        assert not hasattr(used, "model_patcher")
+
+
+def test_tiny_vae_choices_come_from_the_registered_folder(monkeypatch):
+    requested = []
+    def files(folder):
+        requested.append(folder)
+        return ["taeh3.safetensors", "taesd_decoder.pth", "taeh3.safetensors"]
+    monkeypatch.setattr(_comfy, "filename_list", files)
+    for node in (samplers.JWTFUltimateKSampler, samplers.JWTFH3KSampler):
+        field = next(i for i in node.define_schema().inputs if i.id == "preview_tiny_vae")
+        assert field.options == ["none", "taeh3.safetensors", "taesd_decoder.pth"]
+    assert requested == ["vae_approx", "vae_approx"]
+
+
+def test_h3_widget_and_socket_contract_remains_stable():
+    spec = legacy_spec(samplers.JWTFH3KSampler)
+    assert list(spec["required"]) == ["latent_image", "sampler_name", "scheduler", "steps", "steps_to_run",
+                                      "denoise", "seed", "decode", "tiled_decode", "preview_fps"]
+    assert list(spec["optional"]) == ["noise", "guider", "sampler", "sigmas", "model", "positive", "vae", "audio_vae",
+                                      "preview", "preview_max_res", "preview_frames", "preview_jpeg_quality", "preview_tiny_vae"]
+    assert spec["required"]["steps"][1]["default"] == 8
+    # Both nodes keep their original serialized widget sequence; new inputs are sockets only.
+    primitive = lambda s: isinstance(s[0], list) or s[0] in ("INT", "FLOAT", "BOOLEAN", "STRING")
+    def widget_names(node):
+        s = legacy_spec(node)
+        return [name for section in ("required", "optional") for name, value in s.get(section, {}).items() if primitive(value)]
+    assert widget_names(samplers.JWTFUltimateKSampler) == ["sampler_name", "scheduler", "steps", "steps_to_run", "cfg", "cfg_enabled",
+            "denoise", "seed", "eta", "sampler_mode", "bongmath", "decode", "tiled_decode", "preview_fps", "preview",
+            "preview_max_res", "preview_frames", "preview_jpeg_quality", "preview_tiny_vae"]
+    assert widget_names(samplers.JWTFH3KSampler) == ["sampler_name", "scheduler", "steps", "steps_to_run", "denoise", "seed",
+            "decode", "tiled_decode", "preview_fps", "preview", "preview_max_res", "preview_frames", "preview_jpeg_quality", "preview_tiny_vae"]
+
+
+@pytest.mark.parametrize("node", [samplers.JWTFUltimateKSampler, samplers.JWTFH3KSampler])
+def test_zero_denoise_without_explicit_sigmas_skips_sampling(node, monkeypatch, rec, events):
+    def unexpected(*args):
+        raise AssertionError("No sampling or preview preparation for denoise=0")
+    monkeypatch.setattr(samplers, "_custom_core", unexpected)
+    monkeypatch.setattr(samplers, "_maybe_preview", unexpected)
+    kwargs = dict(model=object(), positive=[["p"]], latent_image=LATENT, sampler_name="euler", scheduler="beta",
+                  steps=8, steps_to_run=-1, denoise=0, seed=4, decode=False, tiled_decode=False, preview_fps=12)
+    result = run_node(node, **kwargs)
+    assert result["result"][0] is LATENT and result["result"][1] is LATENT and not rec.calls

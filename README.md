@@ -134,7 +134,7 @@ A RefMod is a `.safetensors` file of reference latents (portraits, a short clip,
 | Refmod Character Card Baker | Put a character card into a refmod header, saved to `models/refmods` |
 | MiniMax H3 Image Edit | One-node H3 image edit |
 | H3 Upscale Picker | Same-scale target sizes for the H3 latent upscaler |
-| Ultimate KSampler / H3 KSampler | Samplers with live video preview |
+| Ultimate KSampler / H3 KSampler | Shared sampling backend with live preview, optional decode and advanced guider/noise/sampler inputs; H3 keeps its existing positive-only preset |
 | Model Preview Mirror | Pass-through that shows a sampler's live preview in its own panel |
 
 ## Audio

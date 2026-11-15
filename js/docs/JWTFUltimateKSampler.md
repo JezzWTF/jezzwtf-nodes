@@ -1,13 +1,11 @@
 # Ultimate KSampler
 
-KSampler with live preview, chained step runs, RES4LYF dispatch and optional decode.
+Sampler with optional guider/noise/sampler/sigmas overrides, live preview, partial step runs, RES4LYF and optional decode. Disable CFG for positive-only sampling; CFG=0 keeps its numeric meaning.
 
 ## Inputs
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `model` | Diffusion model used for sampling and optional live previews. | MODEL | Yes |  |
-| `positive` | Positive conditioning passed to the sampling guider. | CONDITIONING | Yes |  |
 | `latent_image` | Starting image, video or audio-video latent to denoise. | LATENT | Yes |  |
 | `sampler_name` | Sampling algorithm, with clown-prefixed choices delegated to RES4LYF when installed. (default: `euler`) | COMBO | Yes | choose from the list |
 | `scheduler` | Noise schedule used when no custom sigmas are connected. (default: `beta`) | COMBO | Yes | `"none"`<br>`"simple"`<br>`"sgm_uniform"`<br>`"karras"`<br>`"exponential"`<br>`"ddim_uniform"`<br>`"beta"`<br>`"normal"`<br>`"linear_quadratic"`<br>`"kl_optimal"` |
@@ -23,6 +21,8 @@ KSampler with live preview, chained step runs, RES4LYF dispatch and optional dec
 | `decode` | Decodes the sampled result through the connected VAEs when enabled. (default: true) | BOOLEAN | Yes |  |
 | `tiled_decode` | Uses tiled decoding for the visual VAE when supported. (default: false) | BOOLEAN | Yes |  |
 | `preview_fps` | Playback speed in frames per second for animated sampling previews. (default: 12) | INT | Yes | 1 to 60 |
+| `model` | Required without a guider. With a guider, an explicitly connected model supplies the widget-generated sigma schedule. | MODEL | No |  |
+| `positive` | Required without a guider. A wired guider carries its own conditioning. | CONDITIONING | No |  |
 | `negative` | Negative conditioning required to use classifier-free guidance. | CONDITIONING | No |  |
 | `vae` | Optional VAE for visual decoding and sampling previews. | VAE | No |  |
 | `audio_vae` | Optional audio VAE for decoding the audio stream of an audio-video latent. | VAE | No |  |
@@ -32,7 +32,10 @@ KSampler with live preview, chained step runs, RES4LYF dispatch and optional dec
 | `preview_max_res` | Maximum preview edge in pixels, with 0 disabling the resolution limit. (default: 1024) | INT | No | 0 to 8192 (step 8) |
 | `preview_frames` | Maximum number of frames in each preview update, with 1 showing a still image. (default: 1) | INT | No | 1 to 1024 |
 | `preview_jpeg_quality` | JPEG compression quality for live preview frames on a scale from 30 to 100. (default: 80) | INT | No | 30 to 100 |
-| `preview_tiny_vae` | Selects a tiny preview decoder, with the current None option using the normal preview fallback. (default: `none`) | COMBO | No | choose from the list |
+| `preview_tiny_vae` | Installed decoder from models/vae_approx; none uses the normal preview fallback. Match the decoder to the model family. (default: `none`) | COMBO | No | choose from the list |
+| `noise` | Built-in samplers: overrides the seed widget. Not supported by RES4LYF clown samplers. | NOISE | No |  |
+| `guider` | Built-in samplers: carries model and conditioning, overriding positive, negative and CFG widgets. Not supported by RES4LYF. | GUIDER | No |  |
+| `sampler` | Built-in samplers: overrides the sampler picker. Not supported by RES4LYF. | SAMPLER | No |  |
 
 ## Outputs
 

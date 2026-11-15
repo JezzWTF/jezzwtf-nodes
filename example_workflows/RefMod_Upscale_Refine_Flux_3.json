@@ -1,0 +1,1015 @@
+{
+  "id": "6d54ead8-a43b-5ef1-999a-adc3ee771f9d",
+  "revision": 0,
+  "last_node_id": 18,
+  "last_link_id": 20,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        600,
+        800
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup, refinement strength and limits",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Upscale and refine with the same references\n\n1. Select an already-generated image in Load Image. Use its original scene prompt in the positive text node.\n2. Select the SAME person's saved bundle for this model family, and the matching VAE, model and encoder. Do not use a Flux.2 bundle with Flux 3; bake a separate bundle from the source photos for that family.\n3. Start with 1.69 megapixels: approximately 1536x1152 for a 1024x768 source. Aspect ratio is retained and dimensions round to a 16-pixel grid. This is a target pixel area, so smaller inputs get enlarged more. Keep the target larger than your input.\n4. Denoise starts at 0.20. Lower it to preserve the generated face/composition more closely; raise cautiously toward 0.30 for stronger redraw. RefMod references remain active throughout the refinement. The sampler receives the VAE-encoded upscaled IMAGE, not an empty latent.\n\nLanczos provides the initial enlargement without a required external upscaler. The diffusion pass synthesizes detail; it does not recover guaranteed original skin, beard or tattoo detail. Compare identity as well as texture. If the face occupies only a small part of a wide shot, a targeted face-crop refinement may be more effective than whole-image enlargement.\n\nThis graph targets Flux 3 Klein Base, its named encoder, Euler/simple, CFG 1, 20 refinement steps and BasicScheduler denoise 0.20. It is a separate family-specific example; do not assume distilled or other variants use the Base settings."
+      ],
+      "widgets_values_named": {
+        "text": "# Upscale and refine with the same references\n\n1. Select an already-generated image in Load Image. Use its original scene prompt in the positive text node.\n2. Select the SAME person's saved bundle for this model family, and the matching VAE, model and encoder. Do not use a Flux.2 bundle with Flux 3; bake a separate bundle from the source photos for that family.\n3. Start with 1.69 megapixels: approximately 1536x1152 for a 1024x768 source. Aspect ratio is retained and dimensions round to a 16-pixel grid. This is a target pixel area, so smaller inputs get enlarged more. Keep the target larger than your input.\n4. Denoise starts at 0.20. Lower it to preserve the generated face/composition more closely; raise cautiously toward 0.30 for stronger redraw. RefMod references remain active throughout the refinement. The sampler receives the VAE-encoded upscaled IMAGE, not an empty latent.\n\nLanczos provides the initial enlargement without a required external upscaler. The diffusion pass synthesizes detail; it does not recover guaranteed original skin, beard or tattoo detail. Compare identity as well as texture. If the face occupies only a small part of a wide shot, a targeted face-crop refinement may be more effective than whole-image enlargement.\n\nThis graph targets Flux 3 Klein Base, its named encoder, Euler/simple, CFG 1, 20 refinement steps and BasicScheduler denoise 0.20. It is a separate family-specific example; do not assume distilled or other variants use the Base settings."
+      }
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        930
+      ],
+      "size": [
+        460,
+        430
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Generated image to enlarge",
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png"
+      ],
+      "widgets_values_named": {
+        "image": "example.png"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ImageScaleToTotalPixels",
+      "pos": [
+        710,
+        40
+      ],
+      "size": [
+        400,
+        180
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_IMAGE_",
+          "type": "IMAGE",
+          "links": [
+            6,
+            20
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Target area - about 1.5x a 1024x768 image",
+      "properties": {
+        "Node name for S&R": "ImageScaleToTotalPixels"
+      },
+      "widgets_values": [
+        "lanczos",
+        1.69,
+        16
+      ],
+      "widgets_values_named": {
+        "upscale_method": "lanczos",
+        "megapixels": 1.69,
+        "resolution_steps": 16
+      }
+    },
+    {
+      "id": 4,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        1440
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            8,
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Matching model",
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "flux3-image-klein-base-int8-convrot.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "flux3-image-klein-base-int8-convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1630
+      ],
+      "size": [
+        360,
+        160
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2,
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Matching text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3vl_4b_int8_convrot.safetensors",
+        "flux3",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+        "type": "flux3",
+        "device": "default"
+      }
+    },
+    {
+      "id": 6,
+      "type": "VAELoader",
+      "pos": [
+        40,
+        1870
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            7,
+            18
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Matching VAE - encode and decode",
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "flux2-vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [
+        710,
+        330
+      ],
+      "size": [
+        430,
+        280
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Use the original scene prompt",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A natural photograph of the person shown in the reference images, seated at a wooden cafe table beside a large window. The person wears a blue linen shirt and holds a white coffee cup with both hands. The composition is a waist-up three-quarter view with the hands and cup clearly visible. Warm window light falls across the face and shirt, with softly blurred chairs, hanging lamps and other tables in the background. Skin has natural texture, and facial features and markings follow the reference person."
+      ],
+      "widgets_values_named": {
+        "text": "A natural photograph of the person shown in the reference images, seated at a wooden cafe table beside a large window. The person wears a blue linen shirt and holds a white coffee cup with both hands. The composition is a waist-up three-quarter view with the hands and cup clearly visible. Warm window light falls across the face and shirt, with softly blurred chairs, hanging lamps and other tables in the background. Skin has natural texture, and facial features and markings follow the reference person."
+      }
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [
+        710,
+        640
+      ],
+      "size": [
+        430,
+        180
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 9,
+      "type": "JWTFUnifiedRefModApply",
+      "pos": [
+        1210,
+        40
+      ],
+      "size": [
+        460,
+        850
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 4,
+          "shape": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 5,
+          "shape": 7
+        },
+        {
+          "name": "extra_image",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "latent_in",
+          "type": "LATENT",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            10
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "title": "Same saved person references",
+      "properties": {
+        "Node name for S&R": "JWTFUnifiedRefModApply"
+      },
+      "widgets_values": [
+        "auto (from refmod)",
+        "None",
+        "",
+        "",
+        "None",
+        "None",
+        1024,
+        "keep aspect (resolution)",
+        1.0,
+        true,
+        "ai-toolkit",
+        0,
+        1.0
+      ],
+      "widgets_values_named": {
+        "model": "auto (from refmod)",
+        "refmod_1": "None",
+        "prompt": "",
+        "negative_prompt": "",
+        "refmod_2": "None",
+        "refmod_3": "None",
+        "extra_image_resolution": 1024,
+        "extra_image_scale": "keep aspect (resolution)",
+        "ref_strength": 1.0,
+        "ref_on_negative": true,
+        "edit_format": "ai-toolkit",
+        "latent_idx": 0,
+        "guide_strength": 1.0
+      }
+    },
+    {
+      "id": 10,
+      "type": "VAEEncode",
+      "pos": [
+        1210,
+        1020
+      ],
+      "size": [
+        410,
+        140
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            16
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Encode the enlarged generated image",
+      "properties": {
+        "Node name for S&R": "VAEEncode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 11,
+      "type": "RandomNoise",
+      "pos": [
+        1740,
+        40
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_NOISE_",
+          "type": "NOISE",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Refinement seed",
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        7,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "noise_seed": 7,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 12,
+      "type": "CFGGuider",
+      "pos": [
+        1740,
+        240
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 8
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 9
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_GUIDER_",
+          "type": "GUIDER",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Reference-conditioned refinement",
+      "properties": {
+        "Node name for S&R": "CFGGuider"
+      },
+      "widgets_values": [
+        1.0
+      ],
+      "widgets_values_named": {
+        "cfg": 1.0
+      }
+    },
+    {
+      "id": 13,
+      "type": "KSamplerSelect",
+      "pos": [
+        1740,
+        500
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_SAMPLER_",
+          "type": "SAMPLER",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Euler",
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 14,
+      "type": "BasicScheduler",
+      "pos": [
+        1740,
+        680
+      ],
+      "size": [
+        360,
+        220
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_SIGMAS_",
+          "type": "SIGMAS",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Refinement strength and steps",
+      "properties": {
+        "Node name for S&R": "BasicScheduler"
+      },
+      "widgets_values": [
+        "simple",
+        20,
+        0.2
+      ],
+      "widgets_values_named": {
+        "scheduler": "simple",
+        "steps": 20,
+        "denoise": 0.2
+      }
+    },
+    {
+      "id": 15,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        2190,
+        40
+      ],
+      "size": [
+        420,
+        330
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 12
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 13
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 14
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 15
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            17
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Refine the enlarged image with RefMod",
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 16,
+      "type": "VAEDecode",
+      "pos": [
+        2680,
+        40
+      ],
+      "size": [
+        330,
+        130
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 17
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            19
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Decode refinement",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 17,
+      "type": "SaveImage",
+      "pos": [
+        3080,
+        40
+      ],
+      "size": [
+        440,
+        620
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Refined result",
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "refmods/upscale_refine/flux3"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmods/upscale_refine/flux3"
+      }
+    },
+    {
+      "id": 18,
+      "type": "PreviewImage",
+      "pos": [
+        2680,
+        830
+      ],
+      "size": [
+        520,
+        630
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Before diffusion - enlarged input",
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      3,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      5,
+      0,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      5,
+      0,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      7,
+      0,
+      9,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      8,
+      0,
+      9,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      3,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      6,
+      0,
+      10,
+      1,
+      "VAE"
+    ],
+    [
+      8,
+      4,
+      0,
+      12,
+      0,
+      "MODEL"
+    ],
+    [
+      9,
+      9,
+      0,
+      12,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      10,
+      9,
+      1,
+      12,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      11,
+      4,
+      0,
+      14,
+      0,
+      "MODEL"
+    ],
+    [
+      12,
+      11,
+      0,
+      15,
+      0,
+      "NOISE"
+    ],
+    [
+      13,
+      12,
+      0,
+      15,
+      1,
+      "GUIDER"
+    ],
+    [
+      14,
+      13,
+      0,
+      15,
+      2,
+      "SAMPLER"
+    ],
+    [
+      15,
+      14,
+      0,
+      15,
+      3,
+      "SIGMAS"
+    ],
+    [
+      16,
+      10,
+      0,
+      15,
+      4,
+      "LATENT"
+    ],
+    [
+      17,
+      15,
+      0,
+      16,
+      0,
+      "LATENT"
+    ],
+    [
+      18,
+      6,
+      0,
+      16,
+      1,
+      "VAE"
+    ],
+    [
+      19,
+      16,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      20,
+      3,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "flux3",
+      "purpose": "upscale_refine",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

@@ -1,0 +1,774 @@
+{
+  "id": "dbaba965-5bc9-5dff-a1d9-f7c015644825",
+  "revision": 0,
+  "last_node_id": 13,
+  "last_link_id": 12,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        460,
+        1000
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup \u00b7 read before queueing",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Reference Audition \u00b7 controlled reference comparisons\n\n1. Bake a Flux.2 bundle with 2\u20134 reference images using RefMod_Bake_Image_Families.json and its matching VAE. Choose flux2 BEFORE baking. This graph targets Klein Base 4B with its Qwen3-4B text encoder and Flux.2 VAE.\n2. Choose that saved bundle in Reference Audition. None intentionally stops execution until you choose one. Edit the positive/negative text nodes. Do not apply references upstream.\n3. Queue once. The first row uses every reference; subsequent rows omit one reference each. The seed, prompt, 512\u00d7512 target and sampler settings stay fixed. Flux2Scheduler is connected to sigmas; its steps override Audition's steps, scheduler and denoise widgets. Keep scheduler dimensions matched to the target. The Base preset uses 20 steps and CFG 5; CFG 1 disables classifier-free guidance. Five renders and a 120s soft budget are starting limits. An in-flight render finishes before the time budget is checked; skipped reference numbers appear in the report.\n4. Inspect the contact sheet. Change measures influence, NOT improvement, identity accuracy or quality. For example, compare the baseline against Without reference 2 to see what reference 2 contributes.\n5. Enter references to KEEP in Save Audition Selection, e.g. 1,3. Numbering follows the original bake order. Choose a new name, enable save, then queue again. With ComfyUI's upstream cache retained, only the saver runs. Keep seed fixed. The source bundle is preserved; overwrite is off.\n\n## Other families\n\nThis example is wired for Flux.2. To adapt it, replace the model components AND target latent together. Qwen/Fibo/MOSS/Krea need clip and the Audition prompt widgets; remove the upstream positive/negative connections and enter the prompt inside Audition. Flux uses the wired text conditions. Replace/disconnect Flux2Scheduler when moving to another family. The official MOSS adapter needs Moss-Image-Edit; the official Krea style adapter needs Krea2 style reference. Set CFG, steps and model patches for that family as in its Apply example. MOSS/Krea also need a matching edit LoRA. LTX needs clean video conditioning and a video target; use Euler. Audition fixes target noise and crops guides before decoding. H3 bundles appear as H3: <name> and need H3 prompt conditioning and a plain video target; split nested AV first. Video previews show first/middle/last frames; audio is not auditioned.\n\nUse production checkpoint settings for a final comparison. Low-step trials are for screening; findings can change with the scene and seed."
+      ],
+      "widgets_values_named": {
+        "text": "# Reference Audition \u00b7 controlled reference comparisons\n\n1. Bake a Flux.2 bundle with 2\u20134 reference images using RefMod_Bake_Image_Families.json and its matching VAE. Choose flux2 BEFORE baking. This graph targets Klein Base 4B with its Qwen3-4B text encoder and Flux.2 VAE.\n2. Choose that saved bundle in Reference Audition. None intentionally stops execution until you choose one. Edit the positive/negative text nodes. Do not apply references upstream.\n3. Queue once. The first row uses every reference; subsequent rows omit one reference each. The seed, prompt, 512\u00d7512 target and sampler settings stay fixed. Flux2Scheduler is connected to sigmas; its steps override Audition's steps, scheduler and denoise widgets. Keep scheduler dimensions matched to the target. The Base preset uses 20 steps and CFG 5; CFG 1 disables classifier-free guidance. Five renders and a 120s soft budget are starting limits. An in-flight render finishes before the time budget is checked; skipped reference numbers appear in the report.\n4. Inspect the contact sheet. Change measures influence, NOT improvement, identity accuracy or quality. For example, compare the baseline against Without reference 2 to see what reference 2 contributes.\n5. Enter references to KEEP in Save Audition Selection, e.g. 1,3. Numbering follows the original bake order. Choose a new name, enable save, then queue again. With ComfyUI's upstream cache retained, only the saver runs. Keep seed fixed. The source bundle is preserved; overwrite is off.\n\n## Other families\n\nThis example is wired for Flux.2. To adapt it, replace the model components AND target latent together. Qwen/Fibo/MOSS/Krea need clip and the Audition prompt widgets; remove the upstream positive/negative connections and enter the prompt inside Audition. Flux uses the wired text conditions. Replace/disconnect Flux2Scheduler when moving to another family. The official MOSS adapter needs Moss-Image-Edit; the official Krea style adapter needs Krea2 style reference. Set CFG, steps and model patches for that family as in its Apply example. MOSS/Krea also need a matching edit LoRA. LTX needs clean video conditioning and a video target; use Euler. Audition fixes target noise and crops guides before decoding. H3 bundles appear as H3: <name> and need H3 prompt conditioning and a plain video target; split nested AV first. Video previews show first/middle/last frames; audio is not auditioned.\n\nUse production checkpoint settings for a final comparison. Low-step trials are for screening; findings can change with the scene and seed."
+      }
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        1160
+      ],
+      "size": [
+        420,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load Flux.2 Klein Base 4B",
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "flux-2-klein-base-4b.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "flux-2-klein-base-4b.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1360
+      ],
+      "size": [
+        420,
+        160
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load Klein Qwen3-4B text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen_3_4b.safetensors",
+        "flux2",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen_3_4b.safetensors",
+        "type": "flux2",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        40,
+        1600
+      ],
+      "size": [
+        420,
+        100
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load matching Flux.2 VAE",
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "YOUR_FLUX2_VAE.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "YOUR_FLUX2_VAE.safetensors"
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        560,
+        60
+      ],
+      "size": [
+        400,
+        280
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Prompt held fixed in every trial",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A portrait of the reference character in a sunlit greenhouse, natural light, detailed clothing."
+      ],
+      "widgets_values_named": {
+        "text": "A portrait of the reference character in a sunlit greenhouse, natural light, detailed clothing."
+      }
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        560,
+        420
+      ],
+      "size": [
+        400,
+        220
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative prompt held fixed",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 7,
+      "type": "EmptyFlux2LatentImage",
+      "pos": [
+        560,
+        740
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_LATENT_",
+          "type": "LATENT",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Fixed 512\u00d7512 target \u00b7 batch one",
+      "properties": {
+        "Node name for S&R": "EmptyFlux2LatentImage"
+      },
+      "widgets_values": [
+        512,
+        512,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 512,
+        "height": 512,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 8,
+      "type": "JWTFReferenceAudition",
+      "pos": [
+        1040,
+        60
+      ],
+      "size": [
+        500,
+        1100
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 4
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 5
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 6,
+          "shape": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 7,
+          "shape": 7
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 11,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "contact_sheet",
+          "type": "IMAGE",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "audition",
+          "type": "JWTF_REF_AUDITION",
+          "links": [
+            10
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            9
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "All references vs individual omissions",
+      "properties": {
+        "Node name for S&R": "JWTFReferenceAudition"
+      },
+      "widgets_values": [
+        "None",
+        42,
+        20,
+        5,
+        "euler",
+        "simple",
+        1,
+        5,
+        120,
+        "",
+        "",
+        "ai-toolkit (kv_cache off)",
+        1,
+        true,
+        0
+      ],
+      "widgets_values_named": {
+        "refmod": "None",
+        "seed": 42,
+        "steps": 20,
+        "cfg": 5,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1,
+        "max_renders": 5,
+        "time_budget_seconds": 120,
+        "prompt": "",
+        "negative_prompt": "",
+        "edit_format": "ai-toolkit (kv_cache off)",
+        "ref_strength": 1,
+        "ref_on_negative": true,
+        "latent_idx": 0
+      }
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [
+        1620,
+        60
+      ],
+      "size": [
+        650,
+        900
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Compare labeled contact sheet",
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 10,
+      "type": "PreviewAny",
+      "pos": [
+        1620,
+        1060
+      ],
+      "size": [
+        650,
+        420
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Tested / skipped omissions and influence",
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 11,
+      "type": "JWTFSaveAuditionSelection",
+      "pos": [
+        2350,
+        60
+      ],
+      "size": [
+        440,
+        320
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audition",
+          "type": "JWTF_REF_AUDITION",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "path",
+          "type": "STRING",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Choose refs to KEEP \u00b7 save off initially",
+      "properties": {
+        "Node name for S&R": "JWTFSaveAuditionSelection"
+      },
+      "widgets_values": [
+        "all",
+        "audition_selection",
+        false,
+        false
+      ],
+      "widgets_values_named": {
+        "keep_refs": "all",
+        "name": "audition_selection",
+        "save": false,
+        "overwrite": false
+      }
+    },
+    {
+      "id": 12,
+      "type": "Flux2Scheduler",
+      "pos": [
+        560,
+        1040
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_SIGMAS_",
+          "type": "SIGMAS",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Flux.2 schedule \u00b7 fixed 512\u00d7512 target",
+      "properties": {
+        "Node name for S&R": "Flux2Scheduler"
+      },
+      "widgets_values": [
+        20,
+        512,
+        512
+      ],
+      "widgets_values_named": {
+        "steps": 20,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": 13,
+      "type": "PreviewAny",
+      "pos": [
+        2350,
+        480
+      ],
+      "size": [
+        440,
+        180
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Saved bundle path",
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      3,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      2,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      4,
+      0,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      5,
+      7,
+      0,
+      8,
+      2,
+      "LATENT"
+    ],
+    [
+      6,
+      5,
+      0,
+      8,
+      4,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      6,
+      0,
+      8,
+      5,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      8,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      8,
+      2,
+      10,
+      0,
+      "STRING"
+    ],
+    [
+      10,
+      8,
+      1,
+      11,
+      0,
+      "JWTF_REF_AUDITION"
+    ],
+    [
+      11,
+      12,
+      0,
+      8,
+      6,
+      "SIGMAS"
+    ],
+    [
+      12,
+      11,
+      0,
+      13,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Setup and model components",
+      "bounding": [
+        20,
+        20,
+        500,
+        1730
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Fixed prompts, target and schedule",
+      "bounding": [
+        540,
+        20,
+        440,
+        1270
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. Bounded audition",
+      "bounding": [
+        1020,
+        20,
+        540,
+        1200
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. Inspect influence",
+      "bounding": [
+        1600,
+        20,
+        690,
+        1500
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. Save a new selection",
+      "bounding": [
+        2330,
+        20,
+        480,
+        700
+      ],
+      "color": "#49636b",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "flux2",
+      "purpose": "audition",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

@@ -1,0 +1,1092 @@
+{
+  "id": "f3dbe7c0-5723-566c-9b90-30c69bd1e205",
+  "revision": 0,
+  "last_node_id": 16,
+  "last_link_id": 23,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        80
+      ],
+      "size": [
+        420,
+        720
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup required \u00b7 select models and a saved bundle",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# LTX Video 2B 0.9.5 \u00b7 use a saved RefMod\n\n1. Run RefMod_Bake_LTX_Guide.json first, with model=ltxv and the matching VAE.\n2. The loaders name the exact checkpoint variant, text encoder and VAE this preset targets. Install those files or their matching precision variants.\n3. In Image RefMod Apply, select ltxv/example_character (or your own bundle). Model is auto (from refmod). Leaving the picker on None stops execution until a bundle is chosen. Refresh node definitions (R) after creating a bundle if it is not listed.\n4. Edit the prompt, then queue. References condition the result; identity, style and edit fidelity depend on the model and task.\n\n## Settings\n\nSampler values are starting points, not universal presets. Use the settings recommended for your exact checkpoint, especially for distilled models. Baked references must use the same VAE family as generation.\n\n## LTX video-only setup\n\nThis example uses the video-only ltx-video-2b-v0.9.5 checkpoint and its bundled VAE, with separate T5 encoding (CLIP type ltxv). Use the 512\u00d7512 guide from the companion bake example, encoded with the SAME checkpoint's VAE. The target has 49 frames at 24fps. latent_idx is in latent frames. LTXVScheduler uses 30 steps, max_shift=2.05, base_shift=0.95, stretch on and terminal=0.1. It reads the clean target's dimensions. The returned latent contains appended guide frames: LTXV Crop Guides MUST stay between sampling and decoding. The result is saved as a WebM video. LTXV Add Latent Guide must exist in your ComfyUI build.\n\nOptional: combine refmod_2/refmod_3 from the SAME family. ref_strength sets how long image references are active, not their pixel amplitude."
+      ],
+      "widgets_values_named": {
+        "text": "# LTX Video 2B 0.9.5 \u00b7 use a saved RefMod\n\n1. Run RefMod_Bake_LTX_Guide.json first, with model=ltxv and the matching VAE.\n2. The loaders name the exact checkpoint variant, text encoder and VAE this preset targets. Install those files or their matching precision variants.\n3. In Image RefMod Apply, select ltxv/example_character (or your own bundle). Model is auto (from refmod). Leaving the picker on None stops execution until a bundle is chosen. Refresh node definitions (R) after creating a bundle if it is not listed.\n4. Edit the prompt, then queue. References condition the result; identity, style and edit fidelity depend on the model and task.\n\n## Settings\n\nSampler values are starting points, not universal presets. Use the settings recommended for your exact checkpoint, especially for distilled models. Baked references must use the same VAE family as generation.\n\n## LTX video-only setup\n\nThis example uses the video-only ltx-video-2b-v0.9.5 checkpoint and its bundled VAE, with separate T5 encoding (CLIP type ltxv). Use the 512\u00d7512 guide from the companion bake example, encoded with the SAME checkpoint's VAE. The target has 49 frames at 24fps. latent_idx is in latent frames. LTXVScheduler uses 30 steps, max_shift=2.05, base_shift=0.95, stretch on and terminal=0.1. It reads the clean target's dimensions. The returned latent contains appended guide frames: LTXV Crop Guides MUST stay between sampling and decoding. The result is saved as a WebM video. LTXV Add Latent Guide must exist in your ComfyUI build.\n\nOptional: combine refmod_2/refmod_3 from the SAME family. ref_strength sets how long image references are active, not their pixel amplitude."
+      }
+    },
+    {
+      "id": 2,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        40,
+        880
+      ],
+      "size": [
+        360,
+        150
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            8,
+            22
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Load LTX Video 2B 0.9.5 checkpoint and VAE",
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "ltx-video-2b-v0.9.5.safetensors"
+      ],
+      "widgets_values_named": {
+        "ckpt_name": "ltx-video-2b-v0.9.5.safetensors"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1050
+      ],
+      "size": [
+        360,
+        150
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load LTX Video 2B 0.9.5 text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "t5xxl_fp16.safetensors",
+        "ltxv",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "t5xxl_fp16.safetensors",
+        "type": "ltxv",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [
+        500,
+        80
+      ],
+      "size": [
+        380,
+        270
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Prompt \u00b7 describe the new scene",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "The reference character turns toward the camera in a sunlit greenhouse, gentle natural movement, steady camera."
+      ],
+      "widgets_values_named": {
+        "text": "The reference character turns toward the camera in a sunlit greenhouse, gentle natural movement, steady camera."
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        500,
+        420
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative prompt",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "blur, distortion, low quality"
+      ],
+      "widgets_values_named": {
+        "text": "blur, distortion, low quality"
+      }
+    },
+    {
+      "id": 6,
+      "type": "JWTFUnifiedRefModApply",
+      "pos": [
+        1350,
+        80
+      ],
+      "size": [
+        470,
+        1050
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 5,
+          "shape": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 6,
+          "shape": 7
+        },
+        {
+          "name": "extra_image",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 8,
+          "shape": 7
+        },
+        {
+          "name": "latent_in",
+          "type": "LATENT",
+          "link": 7,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            11,
+            18
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            12,
+            19
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            17
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Choose your saved LTX Video 2B 0.9.5 RefMod",
+      "properties": {
+        "Node name for S&R": "JWTFUnifiedRefModApply"
+      },
+      "widgets_values": [
+        "auto (from refmod)",
+        "None",
+        "",
+        "",
+        "None",
+        "None",
+        1024,
+        "keep aspect (resolution)",
+        1.0,
+        true,
+        "ai-toolkit (kv_cache off)",
+        0,
+        0.8
+      ],
+      "widgets_values_named": {
+        "model": "auto (from refmod)",
+        "refmod_1": "None",
+        "prompt": "",
+        "negative_prompt": "",
+        "refmod_2": "None",
+        "refmod_3": "None",
+        "extra_image_resolution": 1024,
+        "extra_image_scale": "keep aspect (resolution)",
+        "ref_strength": 1.0,
+        "ref_on_negative": true,
+        "edit_format": "ai-toolkit (kv_cache off)",
+        "latent_idx": 0,
+        "guide_strength": 0.8
+      }
+    },
+    {
+      "id": 7,
+      "type": "LTXVConditioning",
+      "pos": [
+        940,
+        80
+      ],
+      "size": [
+        330,
+        160
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 3
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ],
+          "slot_index": 1
+        }
+      ],
+      "title": "24 fps conditioning",
+      "properties": {
+        "Node name for S&R": "LTXVConditioning"
+      },
+      "widgets_values": [
+        24
+      ],
+      "widgets_values_named": {
+        "frame_rate": 24
+      }
+    },
+    {
+      "id": 8,
+      "type": "EmptyLTXVLatentVideo",
+      "pos": [
+        940,
+        360
+      ],
+      "size": [
+        330,
+        220
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_LATENT_",
+          "type": "LATENT",
+          "links": [
+            7,
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "512\u00d7512 \u00b7 49-frame target",
+      "properties": {
+        "Node name for S&R": "EmptyLTXVLatentVideo"
+      },
+      "widgets_values": [
+        512,
+        512,
+        49,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 512,
+        "height": 512,
+        "length": 49,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 9,
+      "type": "RandomNoise",
+      "pos": [
+        1880,
+        80
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_NOISE_",
+          "type": "NOISE",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Fixed seed",
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "noise_seed": 42,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 10,
+      "type": "CFGGuider",
+      "pos": [
+        1880,
+        290
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 10
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 11
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_GUIDER_",
+          "type": "GUIDER",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Flux.2 guidance",
+      "properties": {
+        "Node name for S&R": "CFGGuider"
+      },
+      "widgets_values": [
+        3.0
+      ],
+      "widgets_values_named": {
+        "cfg": 3.0
+      }
+    },
+    {
+      "id": 11,
+      "type": "KSamplerSelect",
+      "pos": [
+        1880,
+        550
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_SAMPLER_",
+          "type": "SAMPLER",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Euler",
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 12,
+      "type": "LTXVScheduler",
+      "pos": [
+        1880,
+        730
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "link": 9,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_SIGMAS_",
+          "type": "SIGMAS",
+          "links": [
+            16
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "LTX video schedule",
+      "properties": {
+        "Node name for S&R": "LTXVScheduler"
+      },
+      "widgets_values": [
+        30,
+        2.05,
+        0.95,
+        true,
+        0.1
+      ],
+      "widgets_values_named": {
+        "steps": 30,
+        "max_shift": 2.05,
+        "base_shift": 0.95,
+        "stretch": true,
+        "terminal": 0.1
+      }
+    },
+    {
+      "id": 13,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        2300,
+        80
+      ],
+      "size": [
+        360,
+        280
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 13
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 14
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 15
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 16
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            20
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Sample with native model schedule",
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 14,
+      "type": "LTXVCropGuides",
+      "pos": [
+        2720,
+        80
+      ],
+      "size": [
+        340,
+        200
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 18
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 19
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            21
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Remove appended guide frames before decode",
+      "properties": {
+        "Node name for S&R": "LTXVCropGuides"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 15,
+      "type": "VAEDecode",
+      "pos": [
+        3120,
+        80
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 21
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Decode the generated result",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 16,
+      "type": "SaveWEBM",
+      "pos": [
+        3490,
+        80
+      ],
+      "size": [
+        400,
+        500
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Save WebM video",
+      "properties": {
+        "Node name for S&R": "SaveWEBM"
+      },
+      "widgets_values": [
+        "refmods/ltxv",
+        "vp9",
+        24,
+        24
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmods/ltxv",
+        "codec": "vp9",
+        "fps": 24,
+        "crf": 24
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      3,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      4,
+      0,
+      7,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      4,
+      5,
+      0,
+      7,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      7,
+      0,
+      6,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      7,
+      1,
+      6,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      8,
+      0,
+      6,
+      5,
+      "LATENT"
+    ],
+    [
+      8,
+      2,
+      2,
+      6,
+      4,
+      "VAE"
+    ],
+    [
+      9,
+      8,
+      0,
+      12,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      2,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      11,
+      6,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      12,
+      6,
+      1,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      13,
+      9,
+      0,
+      13,
+      0,
+      "NOISE"
+    ],
+    [
+      14,
+      10,
+      0,
+      13,
+      1,
+      "GUIDER"
+    ],
+    [
+      15,
+      11,
+      0,
+      13,
+      2,
+      "SAMPLER"
+    ],
+    [
+      16,
+      12,
+      0,
+      13,
+      3,
+      "SIGMAS"
+    ],
+    [
+      17,
+      6,
+      2,
+      13,
+      4,
+      "LATENT"
+    ],
+    [
+      18,
+      6,
+      0,
+      14,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      19,
+      6,
+      1,
+      14,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      20,
+      13,
+      0,
+      14,
+      2,
+      "LATENT"
+    ],
+    [
+      21,
+      14,
+      2,
+      15,
+      0,
+      "LATENT"
+    ],
+    [
+      22,
+      2,
+      2,
+      15,
+      1,
+      "VAE"
+    ],
+    [
+      23,
+      15,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Setup and matching model components",
+      "bounding": [
+        20,
+        20,
+        460,
+        1410
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Prompt conditioning",
+      "bounding": [
+        480,
+        20,
+        420,
+        1110
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. Video target and frame rate",
+      "bounding": [
+        920,
+        20,
+        370,
+        620
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. Apply the saved references",
+      "bounding": [
+        1330,
+        20,
+        510,
+        1150
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. Sample",
+      "bounding": [
+        1860,
+        20,
+        820,
+        1030
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "6. Crop guides, decode and save",
+      "bounding": [
+        3100,
+        20,
+        830,
+        650
+      ],
+      "color": "#49636b",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "ltxv",
+      "purpose": "apply",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

@@ -8,4 +8,8 @@ from .audio_loader import JWTFAudioLoader
 
 NODES: list[type[io.ComfyNode]] = [JWTFAudioLoader, JWTFAlbumCover]
 
+from .waveform import register_routes
+
+register_routes()
+
 __all__ = ["NODES"]

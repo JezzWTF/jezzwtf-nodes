@@ -28,6 +28,9 @@ _MODULES: tuple[str, ...] = (
     "samplers",
     "upscale_picker",
     "ultimate_loader",
+    "clip_doctor",
+    "reference_audition",
+    "reference_diagnostic",
 )
 
 for _name in _MODULES:

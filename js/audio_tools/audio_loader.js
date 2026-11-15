@@ -2,16 +2,11 @@
 // (The frontend's own audio-upload widget only supports the core Load Audio node, so this node brings its own.)
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
-import { chain, findWidget, fitHeight, h } from "../utility_core/_shared.js";
+import { chain, findWidget, fitHeight, h, onWidget } from "../utility_core/_shared.js";
+import { createWaveform } from "./waveform.js";
 
 const NODE = "JWTFAudioLoader";
 const NONE = "(no audio in input)";
-
-const urlFor = (name) => {
-  const slash = name.lastIndexOf("/");
-  const q = new URLSearchParams({ filename: name.slice(slash + 1), subfolder: slash < 0 ? "" : name.slice(0, slash), type: "input" });
-  return api.apiURL(`/view?${q}`);
-};
 
 async function upload(file) {
   const body = new FormData();
@@ -31,13 +26,15 @@ function setup(node) {
   const status = h("span.jwtf-muted", {});
   const input = h("input", { type: "file", accept: "audio/*,.flac,.m4a,.opus,.aac", hidden: true });
   const button = h("button.jwtf-btn", { type: "button" }, "Upload audio…");
-  const body = h("div.jwtf-card", {}, h("div.jwtf-row", {}, button, status), player);
+  const waveform = createWaveform(node, player);
+  const body = h("div.jwtf-card", {}, h("div.jwtf-row", {}, button, status), waveform.body, player);
   body.append(input);
 
   const show = () => {
-    const name = String(picker.value ?? "");
-    if (!name || name === NONE) { player.removeAttribute("src"); return; }
-    player.src = urlFor(name);
+    const name = String(findWidget(node, "path")?.value || picker.value || "").trim();
+    if (!name || name === NONE) { player.removeAttribute("src"); waveform.load(""); return; }
+    player.src = api.apiURL(`/jezzwtf/audio/source?${new URLSearchParams({file: name})}`);
+    waveform.load(name);
   };
   button.addEventListener("click", () => input.click());
   input.addEventListener("change", async () => {
@@ -65,7 +62,9 @@ function setup(node) {
   const previous = picker.callback;
   picker.callback = function (...args) { previous?.apply(this, args); show(); };
 
-  node.addDOMWidget("jwtf_audio_preview", "jwtf_audio_preview", body, { serialize: false, getMinHeight: () => 78 });
+  const path = findWidget(node, "path");
+  if (path) onWidget(path, show);
+  node.addDOMWidget("jwtf_audio_preview", "jwtf_audio_preview", body, { serialize: false, getMinHeight: () => 210 });
   node._jwtfAudio = { show };
   fitHeight(node, 300);
   show();

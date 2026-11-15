@@ -63,6 +63,12 @@
           "keywords": "match size get image draw image multi load aspect mask"
         },
         {
+          "id": "image-tools",
+          "title": "Image Compare, Image Saver and Mask Editor",
+          "file": "image-tools.md",
+          "keywords": "image compare wipe blend difference mask editor paint erase smart squeeze save png jpeg webp avif ssim compression"
+        },
+        {
           "id": "dataset",
           "title": "Dataset captioning nodes",
           "file": "dataset.md",
@@ -164,7 +170,7 @@
           "id": "refmod-more",
           "title": "Tail and Image RefMod",
           "file": "refmod-more.md",
-          "keywords": "tail capture load unified qwen fibo flux"
+            "keywords": "tail capture load unified qwen fibo flux reference audition selection comparison ablation ltx h3"
         },
         {
           "id": "h3-generate",

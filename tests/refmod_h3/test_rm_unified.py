@@ -27,7 +27,7 @@ def bake(refmod_root: str, model: str, name: str = "alice", n: int = 2, resoluti
 def test_registry_matches_the_spec_table() -> None:
     rows = {k: (h.label, h.format, h.meta_key, h.subfolder, h.max_refs, h.latent_channels, h.stores_images,
                 h.accent, h.apply_needs, sorted(h.apply_uses))
-            for k, h in unified.HANDLERS.items()}
+            for k, h in unified.HANDLERS.items() if k in CHANNELS}
     assert rows == {
         "qwen21": ("Qwen 2.1", "jezzwtf_qwen21_refmod", "jezzwtf_qwen21", "qwen21", 16, 64, True, "#22d3ee",
                    ("clip",), ["clip", "ref_on_negative", "ref_strength"]),
@@ -124,7 +124,7 @@ def test_detect_ignores_non_refmods_and_validation_catches_bad_tensors(refmod_ro
     save_file(tensors, broken, metadata=meta)
     with pytest.raises(RefModError, match="does not match latent"):
         unified.load_refs(broken)
-    with pytest.raises(RefModError, match="not a Qwen/Fibo/Flux"):
+    with pytest.raises(RefModError, match="not a supported"):
         unified.load_refs(plain)
 
 
@@ -134,7 +134,7 @@ def test_index_and_library_payload(refmod_root: str) -> None:
     unified.invalidate(os.path.join(refmod_root, "qwen21", "q.safetensors"))
     assert unified.choices()[0] == "None"
     payload = unified.library_payload()
-    assert [m["key"] for m in payload["models"]] == ["qwen21", "fibo2", "flux3"]
+    assert [m["key"] for m in payload["models"]] == list(unified.HANDLERS)
     by = {r["name"]: r for r in payload["refmods"]}
     assert set(by) == {"flux3/f", "qwen21/q"}
     q, f = by["qwen21/q"], by["flux3/f"]
@@ -239,7 +239,8 @@ def test_is_changed_uses_file_mtimes(refmod_root: str) -> None:
     assert unified.JWTFUnifiedRefModApply.fingerprint_inputs("qwen21/q", "ghost") == f"{key}|missing"
     assert unified.JWTFUnifiedRefModApply.fingerprint_inputs() == ""
     spec = legacy_spec(unified.JWTFUnifiedRefModApply)
-    assert list(spec["optional"])[-4:] == ["extra_image_resolution", "extra_image_scale", "ref_strength", "ref_on_negative"]
+    assert list(spec["optional"])[-8:] == ["extra_image_resolution", "extra_image_scale", "ref_strength", "ref_on_negative",
+                                          "edit_format", "latent_in", "latent_idx", "guide_strength"]
     assert spec["required"]["model"][0][0] == unified.AUTO and json.dumps(spec)
 
 

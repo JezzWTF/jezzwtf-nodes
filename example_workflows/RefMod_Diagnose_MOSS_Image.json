@@ -1,0 +1,907 @@
+{
+  "id": "2b853834-0891-5d15-b871-4b94f64b81ca",
+  "revision": 0,
+  "last_node_id": 15,
+  "last_link_id": 20,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        650,
+        750
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup and interpretation",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# MOSS: saved reference versus native editing\n\nSelect your installed model, encoder, edit LoRA and matching VAE, then choose your EXISTING MOSS bundle. No source upload, export or rebake is required. Restart ComfyUI after updating the pack to load RefMod Conditioning Check.\n\nQueue once to render A (saved reference latents) and B (native MOSS encoding of the RGB references stored inside the same bundle). Both samplers share one LoRA-patched model, prompt, negative, format, seed, schedule and empty 1024x768 target. Output dimensions are independent of reference dimensions and are controlled on the check node. All references are used at full schedule strength on positive and negative. The reference preview shows the first image only.\n\nThe report shows saved/fresh latent shapes and differences. Small differences can arise from 8-bit stored RGB. A different VAE can create larger differences. These numbers do not measure generation quality.\n\nIf A fails and B works, investigate the saved bundle, bake settings and VAE. If both fail, the native path reproduces the failure too: investigate model capability, model/adapter loading and runtime. This workflow does not claim a fix.\n\nThe defaults use stock MOSS SFT. To isolate a modified checkpoint, run with that checkpoint first, then change only the shared model to stock SFT. The default prompt requests the reference person full-body, walking sideways in a red coat at a snowy station, with a wide camera view. Check identity AND the new pose, clothing, framing and setting. A background swap around the original portrait is a failure for this task. Change the prompt once on the check node to update both branches. Results save under output/refmod_diagnostic/A_saved and B_native. Two renders are performed per queue."
+      ],
+      "widgets_values_named": {
+        "text": "# MOSS: saved reference versus native editing\n\nSelect your installed model, encoder, edit LoRA and matching VAE, then choose your EXISTING MOSS bundle. No source upload, export or rebake is required. Restart ComfyUI after updating the pack to load RefMod Conditioning Check.\n\nQueue once to render A (saved reference latents) and B (native MOSS encoding of the RGB references stored inside the same bundle). Both samplers share one LoRA-patched model, prompt, negative, format, seed, schedule and empty 1024x768 target. Output dimensions are independent of reference dimensions and are controlled on the check node. All references are used at full schedule strength on positive and negative. The reference preview shows the first image only.\n\nThe report shows saved/fresh latent shapes and differences. Small differences can arise from 8-bit stored RGB. A different VAE can create larger differences. These numbers do not measure generation quality.\n\nIf A fails and B works, investigate the saved bundle, bake settings and VAE. If both fail, the native path reproduces the failure too: investigate model capability, model/adapter loading and runtime. This workflow does not claim a fix.\n\nThe defaults use stock MOSS SFT. To isolate a modified checkpoint, run with that checkpoint first, then change only the shared model to stock SFT. The default prompt requests the reference person full-body, walking sideways in a red coat at a snowy station, with a wide camera view. Check identity AND the new pose, clothing, framing and setting. A background swap around the original portrait is a failure for this task. Change the prompt once on the check node to update both branches. Results save under output/refmod_diagnostic/A_saved and B_native. Two renders are performed per queue."
+      }
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        850
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Shared diffusion model",
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "moss_image_sft_int8_convrot.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "moss_image_sft_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1030
+      ],
+      "size": [
+        360,
+        160
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Shared text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3.5_9b_w4a8_gptq.safetensors",
+        "moss_image",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3.5_9b_w4a8_gptq.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        40,
+        1260
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            4,
+            12,
+            19
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Matching VAE: native encoding and both decoders",
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "flux2-vae_small.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "flux2-vae_small.safetensors"
+      }
+    },
+    {
+      "id": 5,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        740,
+        850
+      ],
+      "size": [
+        360,
+        160
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Shared edit LoRA",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "moss_image_edit_lora_rank_64_bf16.safetensors",
+        1.0
+      ],
+      "widgets_values_named": {
+        "lora_name": "moss_image_edit_lora_rank_64_bf16.safetensors",
+        "strength_model": 1.0
+      }
+    },
+    {
+      "id": 6,
+      "type": "SkipLayerGuidanceDiTSimple",
+      "pos": [
+        740,
+        1090
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_MODEL_",
+          "type": "MODEL",
+          "links": [
+            7,
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Shared layer 22 guidance",
+      "properties": {
+        "Node name for S&R": "SkipLayerGuidanceDiTSimple"
+      },
+      "widgets_values": [
+        "",
+        "22",
+        0.0,
+        1.0
+      ],
+      "widgets_values_named": {
+        "double_layers": "",
+        "single_layers": "22",
+        "start_percent": 0.0,
+        "end_percent": 1.0
+      }
+    },
+    {
+      "id": 7,
+      "type": "JWTFRefModConditioningCheck",
+      "pos": [
+        740,
+        40
+      ],
+      "size": [
+        470,
+        650
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "saved_positive",
+          "type": "CONDITIONING",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "saved_negative",
+          "type": "CONDITIONING",
+          "links": [
+            9
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "native_positive",
+          "type": "CONDITIONING",
+          "links": [
+            15
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "native_negative",
+          "type": "CONDITIONING",
+          "links": [
+            16
+          ],
+          "slot_index": 3
+        },
+        {
+          "name": "target",
+          "type": "LATENT",
+          "links": [
+            10,
+            17
+          ],
+          "slot_index": 4
+        },
+        {
+          "name": "reference_preview",
+          "type": "IMAGE",
+          "links": [
+            5
+          ],
+          "slot_index": 5
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            6
+          ],
+          "slot_index": 6
+        }
+      ],
+      "title": "Choose existing bundle and enter one edit instruction",
+      "properties": {
+        "Node name for S&R": "JWTFRefModConditioningCheck"
+      },
+      "widgets_values": [
+        "None",
+        "A new full-body photograph of the person shown in the reference images, walking left to right across a snowy railway platform, wearing a red winter coat and carrying a black suitcase. Wide establishing shot from several metres away, head and feet fully visible, side-on walking pose, railway tracks and a station behind them. Preserve the person's facial identity.",
+        "",
+        "Moss-Image-Edit",
+        1024,
+        768
+      ],
+      "widgets_values_named": {
+        "refmod": "None",
+        "prompt": "A new full-body photograph of the person shown in the reference images, walking left to right across a snowy railway platform, wearing a red winter coat and carrying a black suitcase. Wide establishing shot from several metres away, head and feet fully visible, side-on walking pose, railway tracks and a station behind them. Preserve the person's facial identity.",
+        "negative_prompt": "",
+        "edit_format": "Moss-Image-Edit",
+        "output_width": 1024,
+        "output_height": 768
+      }
+    },
+    {
+      "id": 8,
+      "type": "PreviewImage",
+      "pos": [
+        1270,
+        40
+      ],
+      "size": [
+        420,
+        500
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "First stored reference",
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 9,
+      "type": "PreviewAny",
+      "pos": [
+        1270,
+        650
+      ],
+      "size": [
+        530,
+        550
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Saved versus freshly encoded reference report",
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [
+        1870,
+        40
+      ],
+      "size": [
+        360,
+        430
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 8
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 9
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "A_saved - same seed and settings",
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        42,
+        "fixed",
+        30,
+        4.0,
+        "euler",
+        "normal",
+        1.0
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "fixed",
+        "steps": 30,
+        "cfg": 4.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1.0
+      }
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [
+        2300,
+        40
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 11
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "A_saved - decode",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [
+        2670,
+        40
+      ],
+      "size": [
+        420,
+        600
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "A_saved result",
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "refmod_diagnostic/A_saved"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmod_diagnostic/A_saved"
+      }
+    },
+    {
+      "id": 13,
+      "type": "KSampler",
+      "pos": [
+        1870,
+        800
+      ],
+      "size": [
+        360,
+        430
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 14
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 15
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 16
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            18
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "B_native - same seed and settings",
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        42,
+        "fixed",
+        30,
+        4.0,
+        "euler",
+        "normal",
+        1.0
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "fixed",
+        "steps": 30,
+        "cfg": 4.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1.0
+      }
+    },
+    {
+      "id": 14,
+      "type": "VAEDecode",
+      "pos": [
+        2300,
+        800
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 18
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            20
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "B_native - decode",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [
+        2670,
+        800
+      ],
+      "size": [
+        420,
+        600
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "B_native result",
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "refmod_diagnostic/B_native"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmod_diagnostic/B_native"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      5,
+      0,
+      6,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      3,
+      0,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      4,
+      0,
+      7,
+      1,
+      "VAE"
+    ],
+    [
+      5,
+      7,
+      5,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      7,
+      6,
+      9,
+      0,
+      "STRING"
+    ],
+    [
+      7,
+      6,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      8,
+      7,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      9,
+      7,
+      1,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      10,
+      7,
+      4,
+      10,
+      3,
+      "LATENT"
+    ],
+    [
+      11,
+      10,
+      0,
+      11,
+      0,
+      "LATENT"
+    ],
+    [
+      12,
+      4,
+      0,
+      11,
+      1,
+      "VAE"
+    ],
+    [
+      13,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      14,
+      6,
+      0,
+      13,
+      0,
+      "MODEL"
+    ],
+    [
+      15,
+      7,
+      2,
+      13,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      16,
+      7,
+      3,
+      13,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      17,
+      7,
+      4,
+      13,
+      3,
+      "LATENT"
+    ],
+    [
+      18,
+      13,
+      0,
+      14,
+      0,
+      "LATENT"
+    ],
+    [
+      19,
+      4,
+      0,
+      14,
+      1,
+      "VAE"
+    ],
+    [
+      20,
+      14,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "moss_image",
+      "purpose": "diagnose",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

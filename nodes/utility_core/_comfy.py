@@ -4,12 +4,13 @@ Every function degrades gracefully when ComfyUI isn't importable (tests, linters
 """
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import logging
 import os
 import tempfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 import torch
 
@@ -163,3 +164,11 @@ async def read_json_object(request: "web.Request") -> dict[str, object] | None:
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError, RecursionError):
         return None
     return body if isinstance(body, dict) else None
+
+
+def file_sha256(stream: BinaryIO) -> "hashlib._Hash":
+    """SHA-256 of an open binary stream; stands in for hashlib.file_digest, which needs Python 3.11."""
+    hasher = hashlib.sha256()
+    while chunk := stream.read(1 << 20):
+        hasher.update(chunk)
+    return hasher

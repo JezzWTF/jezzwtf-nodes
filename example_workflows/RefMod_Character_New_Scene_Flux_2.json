@@ -1,0 +1,900 @@
+{
+  "id": "7698c72c-2cde-5238-93c6-91c2455e6859",
+  "revision": 0,
+  "last_node_id": 15,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        80
+      ],
+      "size": [
+        420,
+        720
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup required \u00b7 select models and a saved bundle",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Reference person in a new scene - Flux.2 Klein Base 4B\n\nChoose a saved Flux.2 bundle in Image RefMod Apply. For the SAME reference photos saved for another family, bake a separate Flux.2 bundle with flux2-vae.safetensors first; family labels do not convert latents. Use the named model, qwen_3_4b encoder and matching VAE in this graph. No edit LoRA is needed for this preset.\n\nThe reference supplies appearance; the prompt describes a new full-body pose, outfit, camera view and environment. The output starts from a separate empty 1024x768 canvas, not from the reference pixels. Change the target width/height AND Flux2Scheduler dimensions together.\n\nThis exact model/sampling path was checked with a saved portrait in full-weight generation. That is a starting example, not a guarantee of exact identity for every person, seed or scene. Inspect facial identity as well as whether the requested composition changed. The bundle is a reusable collection of references; it adds no identity-training capability beyond the underlying model.\n\nSampling: Klein Base 4B, seed 42, Euler, 20-step Flux2Scheduler, CFG 5. Do not substitute distilled Klein or Flux.2 dev without updating their model components and sampling."
+      ],
+      "widgets_values_named": {
+        "text": "# Reference person in a new scene - Flux.2 Klein Base 4B\n\nChoose a saved Flux.2 bundle in Image RefMod Apply. For the SAME reference photos saved for another family, bake a separate Flux.2 bundle with flux2-vae.safetensors first; family labels do not convert latents. Use the named model, qwen_3_4b encoder and matching VAE in this graph. No edit LoRA is needed for this preset.\n\nThe reference supplies appearance; the prompt describes a new full-body pose, outfit, camera view and environment. The output starts from a separate empty 1024x768 canvas, not from the reference pixels. Change the target width/height AND Flux2Scheduler dimensions together.\n\nThis exact model/sampling path was checked with a saved portrait in full-weight generation. That is a starting example, not a guarantee of exact identity for every person, seed or scene. Inspect facial identity as well as whether the requested composition changed. The bundle is a reusable collection of references; it adds no identity-training capability beyond the underlying model.\n\nSampling: Klein Base 4B, seed 42, Euler, 20-step Flux2Scheduler, CFG 5. Do not substitute distilled Klein or Flux.2 dev without updating their model components and sampling."
+      }
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        880
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load Flux.2 Klein Base 4B diffusion model",
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "flux-2-klein-base-4b.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "flux-2-klein-base-4b.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1050
+      ],
+      "size": [
+        360,
+        150
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load Flux.2 Klein Base 4B text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen_3_4b.safetensors",
+        "flux2",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen_3_4b.safetensors",
+        "type": "flux2",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        40,
+        1280
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load matching VAE",
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "flux2-vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        500,
+        80
+      ],
+      "size": [
+        380,
+        270
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Describe a new pose, composition, clothing and setting",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A new full-body photograph of the person shown in the reference images, walking left to right across a snowy railway platform, wearing a red winter coat and carrying a black suitcase. Wide establishing shot from several metres away, head and feet fully visible, side-on walking pose, railway tracks and a station behind them. Preserve the person's facial identity."
+      ],
+      "widgets_values_named": {
+        "text": "A new full-body photograph of the person shown in the reference images, walking left to right across a snowy railway platform, wearing a red winter coat and carrying a black suitcase. Wide establishing shot from several metres away, head and feet fully visible, side-on walking pose, railway tracks and a station behind them. Preserve the person's facial identity."
+      }
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        500,
+        420
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative prompt",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 7,
+      "type": "JWTFUnifiedRefModApply",
+      "pos": [
+        940,
+        80
+      ],
+      "size": [
+        470,
+        1050
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 3,
+          "shape": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 4,
+          "shape": 7
+        },
+        {
+          "name": "extra_image",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "latent_in",
+          "type": "LATENT",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            7
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "title": "Choose your saved Flux.2 Klein Base 4B RefMod",
+      "properties": {
+        "Node name for S&R": "JWTFUnifiedRefModApply"
+      },
+      "widgets_values": [
+        "auto (from refmod)",
+        "None",
+        "",
+        "",
+        "None",
+        "None",
+        1024,
+        "keep aspect (resolution)",
+        1.0,
+        true,
+        "ai-toolkit (kv_cache off)",
+        0,
+        0.8
+      ],
+      "widgets_values_named": {
+        "model": "auto (from refmod)",
+        "refmod_1": "None",
+        "prompt": "",
+        "negative_prompt": "",
+        "refmod_2": "None",
+        "refmod_3": "None",
+        "extra_image_resolution": 1024,
+        "extra_image_scale": "keep aspect (resolution)",
+        "ref_strength": 1.0,
+        "ref_on_negative": true,
+        "edit_format": "ai-toolkit (kv_cache off)",
+        "latent_idx": 0,
+        "guide_strength": 0.8
+      }
+    },
+    {
+      "id": 8,
+      "type": "EmptyFlux2LatentImage",
+      "pos": [
+        500,
+        780
+      ],
+      "size": [
+        380,
+        200
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_LATENT_",
+          "type": "LATENT",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Independent 1024x768 output canvas",
+      "properties": {
+        "Node name for S&R": "EmptyFlux2LatentImage"
+      },
+      "widgets_values": [
+        1024,
+        768,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 1024,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 9,
+      "type": "RandomNoise",
+      "pos": [
+        1470,
+        80
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_NOISE_",
+          "type": "NOISE",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Fixed seed",
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "noise_seed": 42,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 10,
+      "type": "CFGGuider",
+      "pos": [
+        1470,
+        290
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 6
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_GUIDER_",
+          "type": "GUIDER",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Flux.2 guidance",
+      "properties": {
+        "Node name for S&R": "CFGGuider"
+      },
+      "widgets_values": [
+        5.0
+      ],
+      "widgets_values_named": {
+        "cfg": 5.0
+      }
+    },
+    {
+      "id": 11,
+      "type": "KSamplerSelect",
+      "pos": [
+        1470,
+        550
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_SAMPLER_",
+          "type": "SAMPLER",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Euler",
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 12,
+      "type": "Flux2Scheduler",
+      "pos": [
+        1470,
+        730
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_SIGMAS_",
+          "type": "SIGMAS",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Flux.2 schedule - matches 1024x768 target",
+      "properties": {
+        "Node name for S&R": "Flux2Scheduler"
+      },
+      "widgets_values": [
+        20,
+        1024,
+        768
+      ],
+      "widgets_values_named": {
+        "steps": 20,
+        "width": 1024,
+        "height": 768
+      }
+    },
+    {
+      "id": 13,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        1890,
+        80
+      ],
+      "size": [
+        360,
+        280
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 8
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 9
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 10
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 11
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Sample with native model schedule",
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 14,
+      "type": "VAEDecode",
+      "pos": [
+        2310,
+        80
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 13
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Decode the generated result",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [
+        2680,
+        80
+      ],
+      "size": [
+        400,
+        500
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Save image",
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "refmods/character_new_scene"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmods/character_new_scene"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      3,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      5,
+      0,
+      7,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      4,
+      6,
+      0,
+      7,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      2,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      6,
+      7,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      7,
+      1,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      9,
+      0,
+      13,
+      0,
+      "NOISE"
+    ],
+    [
+      9,
+      10,
+      0,
+      13,
+      1,
+      "GUIDER"
+    ],
+    [
+      10,
+      11,
+      0,
+      13,
+      2,
+      "SAMPLER"
+    ],
+    [
+      11,
+      12,
+      0,
+      13,
+      3,
+      "SIGMAS"
+    ],
+    [
+      12,
+      8,
+      0,
+      13,
+      4,
+      "LATENT"
+    ],
+    [
+      13,
+      13,
+      0,
+      14,
+      0,
+      "LATENT"
+    ],
+    [
+      14,
+      4,
+      0,
+      14,
+      1,
+      "VAE"
+    ],
+    [
+      15,
+      14,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Setup and matching model components",
+      "bounding": [
+        20,
+        20,
+        460,
+        1410
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Prompt conditioning",
+      "bounding": [
+        480,
+        20,
+        420,
+        1110
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "4. Apply the saved references",
+      "bounding": [
+        920,
+        20,
+        510,
+        1150
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "5. Sample",
+      "bounding": [
+        1450,
+        20,
+        820,
+        1030
+      ],
+      "color": "#49636b",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "6. Decode and save",
+      "bounding": [
+        2290,
+        20,
+        830,
+        650
+      ],
+      "color": "#49636b",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "flux2",
+      "purpose": "character_new_scene",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

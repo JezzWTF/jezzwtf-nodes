@@ -1,6 +1,6 @@
 # H3 KSampler
 
-CFG-free SamplerCustomAdvanced-shaped sampler for MiniMax H3 with live preview.
+H3 compatibility preset using the shared sampler backend: eight steps by default and positive-only guidance unless an external guider is supplied. Existing sockets and widget order are preserved.
 
 ## Inputs
 
@@ -28,7 +28,7 @@ CFG-free SamplerCustomAdvanced-shaped sampler for MiniMax H3 with live preview.
 | `preview_max_res` | Maximum preview edge in pixels, with 0 disabling the resolution limit. (default: 1024) | INT | No | 0 to 8192 (step 8) |
 | `preview_frames` | Maximum number of frames in each preview update, with 1 showing a still image. (default: 1) | INT | No | 1 to 1024 |
 | `preview_jpeg_quality` | JPEG compression quality for live preview frames on a scale from 30 to 100. (default: 80) | INT | No | 30 to 100 |
-| `preview_tiny_vae` | Selects a tiny preview decoder, with the current None option using the normal preview fallback. (default: `none`) | COMBO | No | choose from the list |
+| `preview_tiny_vae` | Installed decoder from models/vae_approx; none uses the normal preview fallback. Match the decoder to the model family. (default: `none`) | COMBO | No | choose from the list |
 
 ## Outputs
 

@@ -6,6 +6,7 @@ Loads an audio file from the `input` folder (subfolders included) as AUDIO.
 
 - `audio` picks a file. **Upload audio…** under it copies a file into `input` and selects it; a small player previews the selection.
 - `start` and `length` trim in seconds (`length` 0 keeps the rest). `mono` mixes all channels down to one.
+- Drag either edge of the waveform selection to set `start` and `length`. Drag elsewhere to scrub. Playback stays inside the selected range. The waveform and player follow the picker or the `path` override; audio from input, output and temp is supported.
 - `path` overrides the picker with a file path from the `input`, `output` or `temp` folder, for example the `file_path` of another node.
 
 Outputs: `audio`, `duration` (seconds, after trimming), `sample_rate` and `file_path`. mp3, wav, flac, ogg, opus, m4a, aac, wma and aiff are read.

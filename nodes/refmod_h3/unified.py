@@ -58,6 +58,7 @@ class ApplyContext:
     negative: Cond | None
     ref_strength: float
     ref_on_negative: bool
+    edit_format: str = "ai-toolkit"
 
 
 @dataclass
@@ -80,6 +81,7 @@ class Handler:
     token_downscale: int = TOKEN_DOWNSCALE
     bake_needs: tuple[str, ...] = ("vae",)
     bake_uses: frozenset[str] = field(default_factory=lambda: frozenset({"vae"}))
+    spatial_downscale: int = 16
 
     def ui(self) -> JSONDict:
         return {
@@ -154,6 +156,29 @@ def _enc_fibo(h: Handler, vae: object, frame: torch.Tensor, resolution: int) -> 
     return Encoded(lat=lat, img=rgb, size=(int(rgb.shape[2]), int(rgb.shape[1])))
 
 
+def _enc_fibo2(h: Handler, vae: object, frame: torch.Tensor, resolution: int) -> Encoded:
+    if resolution != 1024:
+        return _enc_fibo(h, vae, frame, resolution)
+    native = _comfy.optional_module("comfy_extras.nodes_fibo2")
+    if native is None or not hasattr(native, "trained_size"):
+        raise RefModError("Fibo 2 references need current native Fibo 2 support in ComfyUI")
+    rgb = rgb_over_white(_as_frame(frame))
+    width, height = native.trained_size(rgb.shape[2] / rgb.shape[1])
+    rgb = _comfy.common_upscale(rgb.movedim(-1, 1), width, height, "lanczos", "center").movedim(1, -1)
+    return Encoded(_encode_4d(vae, rgb, h.latent_channels, h.label), rgb, (width, height))
+
+
+def _enc_kontext(h: Handler, vae: object, frame: torch.Tensor, resolution: int) -> Encoded:
+    if resolution != 1024:
+        return _enc_fibo(h, vae, frame, resolution)
+    native = _comfy.optional_module("comfy_extras.nodes_flux")
+    scale = getattr(native, "FluxKontextImageScale", None)
+    if scale is None:
+        raise RefModError("Kontext references need native FluxKontextImageScale support")
+    rgb = _comfy.call_node(scale, image=rgb_over_white(_as_frame(frame)))[0]
+    return Encoded(_encode_4d(vae, rgb, h.latent_channels, h.label), None, (int(rgb.shape[2]), int(rgb.shape[1])))
+
+
 def _enc_flux3(h: Handler, vae: object, frame: torch.Tensor, resolution: int) -> Encoded:
     rgb = _as_frame(frame)[..., :3]
     if resolution > 0:
@@ -167,7 +192,7 @@ def _enc_flux3(h: Handler, vae: object, frame: torch.Tensor, resolution: int) ->
 
 def _extras_sizes(h: Handler, encs: list[Encoded], resolution: int) -> JSONDict:
     return {"sizes": [[e.size[0], e.size[1]] for e in encs], "latent_channels": h.latent_channels,
-            "downscale": TOKEN_DOWNSCALE, "resolution": resolution}
+            "downscale": h.spatial_downscale, "resolution": resolution}
 
 
 def _extras_flux3(h: Handler, encs: list[Encoded], resolution: int) -> JSONDict:
@@ -180,7 +205,7 @@ def _validate_with_image(h: Handler, lat: torch.Tensor, img: torch.Tensor | None
         raise RefModError(f"{h.label} refmod: latent must be [1, {h.latent_channels}, h, w], got {list(lat.shape)}")
     if img is None or img.dim() != 4 or img.shape[0] != 1 or img.shape[-1] != 3:
         raise RefModError(f"{h.label} refmod: image must be [1, H, W, 3]")
-    if img.shape[1] // 16 != lat.shape[2] or img.shape[2] // 16 != lat.shape[3]:
+    if img.shape[1] // h.spatial_downscale != lat.shape[2] or img.shape[2] // h.spatial_downscale != lat.shape[3]:
         raise RefModError(f"{h.label} refmod: image {img.shape[2]}x{img.shape[1]} does not match latent "
                           f"{lat.shape[3]}x{lat.shape[2]}")
 
@@ -251,7 +276,13 @@ def _build_fibo(h: Handler, ctx: ApplyContext, lats: list[torch.Tensor], imgs: l
         return clip.encode_from_tokens_scheduled(clip.tokenize(text, images=images))  # type: ignore[attr-defined]
 
     pos = enc(ctx.prompt, imgs)
-    neg = enc(ctx.negative_prompt, [])
+    negative_text = ctx.negative_prompt
+    if negative_text.strip():
+        native = _comfy.optional_module("comfy.text_encoders.fibo2")
+        if native is None or not hasattr(native, "TEMPLATE"):
+            raise RefModError("Fibo 2 negative prompts need current native Fibo 2 text encoder support")
+        negative_text = native.TEMPLATE.format(negative_text)
+    neg = enc(negative_text, [])
     if lats:
         pos_r = attach(pos, lats)
         pos = schedule(pos_r, enc(ctx.prompt, []), ctx.ref_strength) if ctx.ref_strength < 1 else pos_r
@@ -262,7 +293,7 @@ def _build_fibo(h: Handler, ctx: ApplyContext, lats: list[torch.Tensor], imgs: l
 
 def _build_flux3(h: Handler, ctx: ApplyContext, lats: list[torch.Tensor], imgs: list[torch.Tensor]) -> tuple[Cond, Cond]:
     if ctx.positive is None:
-        raise RefModError("Flux 3 RefMod Apply needs the positive conditioning connected")
+        raise RefModError(f"{h.label} RefMod Apply needs the positive conditioning connected")
     pos = schedule(attach(ctx.positive, lats), ctx.positive, ctx.ref_strength) if lats else ctx.positive
     if ctx.negative is not None:
         neg = schedule(attach(ctx.negative, lats), ctx.negative, ctx.ref_strength) \
@@ -270,6 +301,105 @@ def _build_flux3(h: Handler, ctx: ApplyContext, lats: list[torch.Tensor], imgs: 
     else:
         neg = pos
     return pos, neg
+
+
+EDIT_FORMATS = {"ai-toolkit": ("index_timestep_zero_isolated", True),
+                "ai-toolkit (kv_cache off)": ("index_timestep_zero", True),
+                "Moss-Image-Edit": ("index_timestep_zero_text_start", False),
+                "Krea2 style reference": ("index_timestep_zero", True)}
+
+# Native TextEncodeQwenImageEditPlus template used by the official Krea2 style blueprint.
+KREA2_STYLE_TEMPLATE = "<|im_start|>system\nDescribe the key features of the input image (color, shape, size, texture, objects, background), then explain how the user's text instruction should alter or modify the image. Generate a new image that meets the user's requirements while maintaining consistency with the original input where appropriate.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
+
+
+def _vision_images(images: list[torch.Tensor], *, upscale: bool = False) -> list[torch.Tensor]:
+    out = []
+    for image in images:
+        height, width = image.shape[1:3]
+        scale = math.sqrt(384 * 384 / (height * width))
+        if not upscale:
+            scale = min(1.0, scale)
+        out.append(_comfy.common_upscale(image.movedim(-1, 1), max(1, round(width * scale)),
+                                        max(1, round(height * scale)), "area", "disabled").movedim(1, -1))
+    return out
+
+
+def _build_edit(h: Handler, ctx: ApplyContext, lats: list[torch.Tensor], imgs: list[torch.Tensor]) -> tuple[Cond, Cond]:
+    if h.key == "moss_image" and getattr(_comfy.optional_module("comfy_extras.nodes_moss_image"), "TextEncodeMOSSImageEdit", None) is None:
+        raise RefModError("MOSS RefMod needs a ComfyUI build with native Text Encode MOSS-Image Edit support. Update ComfyUI and restart. Older MOSS builds need a separate model patch; adding reference_latents alone is not sufficient.")
+    clip = _require_clip(ctx, h.label)
+    if ctx.edit_format not in EDIT_FORMATS:
+        raise RefModError(f"Unknown edit format {ctx.edit_format!r}")
+    if ctx.edit_format == "Krea2 style reference" and h.key != "krea2":
+        raise RefModError("Krea2 style reference is only for the Krea2 style adapter")
+    method, vision = EDIT_FORMATS[ctx.edit_format]
+    options = {}
+    if h.key == "krea2":
+        if ctx.edit_format == "Moss-Image-Edit":
+            raise RefModError("Krea 2 edit LoRAs use an ai-toolkit format, not Moss-Image-Edit")
+        module = _comfy.optional_module("comfy.text_encoders.krea2")
+        template = getattr(module, "KREA2_TEMPLATE", None)
+        if template is None:
+            raise RefModError("Krea 2 needs a ComfyUI build with the Krea 2 text encoder")
+        options["llama_template"] = KREA2_STYLE_TEMPLATE if ctx.edit_format == "Krea2 style reference" else template
+    images = _vision_images(imgs, upscale=ctx.edit_format == "Krea2 style reference") if vision else []
+    prefix = "".join(f"Picture {i + 1}: <|vision_start|><|image_pad|><|vision_end|>" for i in range(len(images)))
+    def enc(text, refs, pictures):
+        cond = clip.encode_from_tokens_scheduled(clip.tokenize((prefix if pictures else "") + text, images=pictures, **options))
+        return _set_values(attach(cond, refs), {"reference_latents_method": method}) if refs else cond
+    pos = schedule(enc(ctx.prompt, lats, images), enc(ctx.prompt, [], []), ctx.ref_strength) if lats else enc(ctx.prompt, [], [])
+    neg = schedule(enc(ctx.negative_prompt, lats, images), enc(ctx.negative_prompt, [], []), ctx.ref_strength) \
+        if lats and ctx.ref_on_negative else enc(ctx.negative_prompt, [], [])
+    return pos, neg
+
+
+def _validate_latent_only(h: Handler, lat: torch.Tensor, img: torch.Tensor | None) -> None:
+    if lat.ndim != 4 or lat.shape[0] != 1 or lat.shape[1] != h.latent_channels or min(lat.shape[2:]) < 1:
+        raise RefModError(f"{h.label}: expected [1,{h.latent_channels},height,width], got {list(lat.shape)}")
+
+
+def _enc_video_reference(h: Handler, vae: object, frame: torch.Tensor, resolution: int) -> Encoded:
+    rgb = rgb_over_white(resize32(_as_frame(frame), resolution))
+    latent = vae.encode(rgb)
+    if h.key == "krea2" and latent.ndim == 4:
+        latent = latent.unsqueeze(2)
+    result = Encoded(latent.float(), rgb if h.stores_images else None, (rgb.shape[2], rgb.shape[1]))
+    _validate_video_reference(h, result.lat, result.img)
+    return result
+
+
+def _validate_video_reference(h: Handler, lat: torch.Tensor, img: torch.Tensor | None) -> None:
+    if lat.ndim != 5 or lat.shape[:3] != (1, h.latent_channels, 1) or min(lat.shape[-2:]) < 1:
+        raise RefModError(f"{h.label}: expected a single-image [1,{h.latent_channels},1,height,width] reference, got {list(lat.shape)}")
+    if h.stores_images:
+        if img is None or img.ndim != 4 or img.shape[0] != 1 or img.shape[-1] != 3:
+            raise RefModError(f"{h.label}: missing RGB reference image")
+        if (img.shape[1] // h.spatial_downscale, img.shape[2] // h.spatial_downscale) != lat.shape[-2:]:
+            raise RefModError(f"{h.label}: image and latent dimensions disagree")
+
+
+def _build_ltx(h: Handler, ctx: ApplyContext, lats, imgs):
+    raise RefModError("LTX references need a target video latent; use Image RefMod Apply with latent_in and the LTX VAE connected")
+
+
+def apply_ltx(positive, negative, latent, vae, lats, latent_idx: int, strength: float):
+    if positive is None or negative is None or latent is None or vae is None:
+        raise RefModError("LTX Apply needs positive, negative, latent_in and vae connected")
+    samples = latent.get("samples")
+    if not isinstance(samples, torch.Tensor) or samples.ndim != 5:
+        raise RefModError("LTX needs a video latent [batch,channels,frames,height,width]; split combined AV latents first")
+    if not 0 <= strength <= 1:
+        raise RefModError("LTX guide strength must be between 0 and 1")
+    module = _comfy.optional_module("comfy_extras.nodes_lt")
+    native = getattr(module, "LTXVAddLatentGuide", None)
+    if native is None:
+        raise RefModError("Update ComfyUI: LTX RefMod Apply requires the core LTXVAddLatentGuide node")
+    if strength == 0:
+        return positive, negative, latent
+    for lat in lats:
+        result = native.execute(positive, negative, vae, latent, {"samples": lat}, int(latent_idx), float(strength))
+        positive, negative, latent = result.args
+    return positive, negative, latent
 
 
 _STD_USES = frozenset({"ref_strength", "ref_on_negative"})
@@ -285,11 +415,25 @@ register_handler(Handler("qwen21", "Qwen 2.1", "jezzwtf_qwen21_refmod", "jezzwtf
                          "#22d3ee", ("clip",), _STD_USES | {"clip"}, _enc_qwen, _extras_sizes,
                          _validate_with_image, _build_qwen))
 register_handler(Handler("fibo2", "Fibo 2", "jezzwtf_fibo2_refmod", "jezzwtf_fibo2", "fibo2", 8, 128, True,
-                         "#f472b6", ("clip",), _STD_USES | {"clip"}, _enc_fibo, _extras_sizes,
+                         "#f472b6", ("clip",), _STD_USES | {"clip"}, _enc_fibo2, _extras_sizes,
                          _validate_with_image, _build_fibo))
 register_handler(Handler("flux3", "Flux 3", "jezzwtf_flux3_refmod", "jezzwtf_flux3", "flux3", 16, 128, False,
                          "#fbbf24", ("positive",), _STD_USES | {"positive"}, _enc_flux3, _extras_flux3,
                          _validate_flux3, _build_flux3))
+register_handler(Handler("moss_image", "MOSS-Image Edit", "jezzwtf_moss_image_refmod", "jezzwtf_moss_image", "moss_image", 16, 128, True,
+                         "#8fb9a8", ("clip",), _STD_USES | {"clip", "edit_format"}, _enc_fibo, _extras_sizes, _validate_with_image, _build_edit))
+register_handler(Handler("krea2", "Krea 2 Edit (edit LoRA required)", "jezzwtf_krea2_refmod", "jezzwtf_krea2", "krea2", 8, 16, True,
+                         "#c5af85", ("clip",), _STD_USES | {"clip", "edit_format"}, _enc_video_reference, _extras_sizes,
+                         _validate_video_reference, _build_edit, spatial_downscale=8))
+register_handler(Handler("flux_kontext", "Flux.1 Kontext", "jezzwtf_flux_kontext_refmod", "jezzwtf_flux_kontext", "flux_kontext", 16, 16, False,
+                         "#b8b8a0", ("positive",), _STD_USES | {"positive"}, _enc_kontext, _extras_sizes,
+                         _validate_latent_only, _build_flux3, spatial_downscale=8))
+register_handler(Handler("flux2", "Flux.2", "jezzwtf_flux2_refmod", "jezzwtf_flux2", "flux2", 16, 128, False,
+                         "#a7b2c3", ("positive",), _STD_USES | {"positive"}, _enc_fibo, _extras_sizes,
+                         _validate_latent_only, _build_flux3))
+register_handler(Handler("ltxv", "LTX Video (image guides)", "jezzwtf_ltxv_refmod", "jezzwtf_ltxv", "ltxv", 16, 128, False,
+                         "#93acbc", ("positive", "negative", "latent_in", "vae"), frozenset({"positive", "negative", "latent_in", "vae", "latent_idx", "guide_strength"}),
+                         _enc_video_reference, _extras_sizes, _validate_video_reference, _build_ltx, token_downscale=32, spatial_downscale=32))
 
 
 # --------------------------------------------------------------------------- file format
@@ -340,7 +484,7 @@ def detect(path: str) -> tuple[Handler, JSONDict] | None:
 def load_refs(path: str) -> tuple[Handler, list[torch.Tensor], list[torch.Tensor]]:
     found = detect(path)
     if found is None:
-        raise RefModError(f"{os.path.basename(path)} is not a Qwen/Fibo/Flux RefMod")
+        raise RefModError(f"{os.path.basename(path)} is not a supported image or LTX RefMod")
     h, meta = found
     count = int(meta.get("count", 0) or 0)  # type: ignore[arg-type]
     lats: list[torch.Tensor] = []
@@ -431,7 +575,7 @@ def entry_sizes(h: Handler, meta: JSONDict) -> list[list[int]]:
             return [[int(s[0]), int(s[1])] for s in v if isinstance(s, list) and len(s) >= 2]  # type: ignore[arg-type]
     shapes = meta.get("shapes")
     if isinstance(shapes, list):
-        return [[int(s[-1]) * 16, int(s[-2]) * 16] for s in shapes if isinstance(s, list) and len(s) >= 2]  # type: ignore[arg-type]
+        return [[int(s[-1]) * h.spatial_downscale, int(s[-2]) * h.spatial_downscale] for s in shapes if isinstance(s, list) and len(s) >= 2]  # type: ignore[arg-type]
     return []
 
 
@@ -446,7 +590,7 @@ def library_payload() -> JSONDict:
             sizes = entry_sizes(h, meta)
             refmods.append({
                 "name": name, "model": h.key, "count": int(meta.get("count", 0) or 0),  # type: ignore[arg-type]
-                "sizes": sizes, "tokens": sum((w // 16) * (hh // 16) for w, hh in sizes),
+                "sizes": sizes, "tokens": sum((w // h.token_downscale) * (hh // h.token_downscale) for w, hh in sizes),
                 "stamp": int(os.path.getmtime(path)), "thumb": bool(meta.get("thumb")) or h.stores_images,
             })
         except Exception as exc:  # malformed metadata, or the file vanished since it was listed
@@ -583,7 +727,7 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
             node_id="JWTFUnifiedRefModApply",
             display_name='Image RefMod Apply',
             category='JezzWTF/refmod',
-            description="Apply saved RefMods to Qwen, Fibo or Flux image-edit conditioning, with the model detected from the RefMod or chosen by hand.",
+            description="Apply saved reference bundles with model-specific conditioning. MOSS and Krea require matching edit LoRAs. LTX image guides need a target video latent and core LTXVAddLatentGuide; crop guides with LTXV Crop Guides after sampling.",
             inputs=[
                 io.Combo.Input("model", options=[AUTO] + list(HANDLERS), default='auto (from refmod)', tooltip="Selects the target model family, with auto using the first selected RefMod's family."),
                 io.Combo.Input("refmod_1", options=choices(), default='None', tooltip="First saved reference bundle to load, or None to omit this slot."),
@@ -600,11 +744,15 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
                 io.Combo.Input("extra_image_scale", options=list(EXTRA_SCALE_LABELS), default='keep aspect (resolution)', optional=True, tooltip="How the extra image is sized: to the resolution setting, or to the pixel area of the first saved reference (its own aspect is kept). With no saved reference the resolution setting is used."),
                 io.Float.Input("ref_strength", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="Fraction of the denoising schedule during which the references are active, for models that support scheduling."),
                 io.Boolean.Input("ref_on_negative", default=True, optional=True, tooltip="Also attaches the references to negative conditioning on model families that support this option."),
+                io.Combo.Input("edit_format", options=list(EDIT_FORMATS), default="ai-toolkit", optional=True, tooltip="MOSS/Krea edit LoRA training layout. Match kv_cache to the training configuration; Moss-Image-Edit is MOSS-only."),
+                io.Latent.Input("latent_in", optional=True, tooltip="Target video latent for LTX guides; other families return an empty latent at the first reference's size."),
+                io.Int.Input("latent_idx", default=0, min=-9999, max=9999, optional=True, tooltip="LTX guide placement in latent frames, not pixel frames."),
+                io.Float.Input("guide_strength", default=1.0, min=0.0, max=1.0, step=0.01, optional=True, tooltip="LTX guide strength; 0 passes the target latent through unchanged."),
             ],
             outputs=[
                 io.Conditioning.Output("positive", tooltip="Positive conditioning built for the selected model with the supplied references."),
                 io.Conditioning.Output("negative", tooltip="Negative conditioning with references attached when supported and enabled."),
-                io.Latent.Output("latent", tooltip="Empty latent shaped like the first reference, or a 64 by 64 latent grid when no references are supplied."),
+                io.Latent.Output("latent", tooltip="For LTX, the target video latent with guide data appended; crop guides after sampling. For image families, an empty latent at the first reference's size, or a 64 by 64 grid without references."),
             ],
         )
 
@@ -628,7 +776,8 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
                 negative_prompt: str = "", positive: Cond | None = None, negative: Cond | None = None,
               refmod_2: str = NONE, refmod_3: str = NONE, extra_image: torch.Tensor | None = None,
               vae: object | None = None, extra_image_resolution: int = 1024, extra_image_scale: str = "",
-              ref_strength: float = 1.0, ref_on_negative: bool = True) -> io.NodeOutput:
+              ref_strength: float = 1.0, ref_on_negative: bool = True, edit_format: str = "ai-toolkit",
+              latent_in: dict | None = None, latent_idx: int = 0, guide_strength: float = 1.0) -> io.NodeOutput:
         h = HANDLERS.get(model) if model != AUTO else None
         if model != AUTO and h is None:
             raise RefModError(f"unknown model {model!r}")
@@ -641,7 +790,7 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
                 continue
             entry = idx.get(n)
             if entry is None:
-                raise RefModError(f"RefMod {n!r} not found or not a Qwen/Fibo/Flux RefMod")
+                raise RefModError(f"RefMod {n!r} not found or not a supported reference bundle")
             fh, fl, fi = load_refs(entry[0])
             if h is None:
                 h = fh
@@ -668,11 +817,14 @@ class JWTFUnifiedRefModApply(io.ComfyNode):
             raise RefModError(f"{h.label} takes at most {h.max_refs} references, got {len(lats)}")
         device = _comfy.intermediate_device()
         lats = [lat.to(device) for lat in lats]
+        if h.key == "ltxv":
+            return io.NodeOutput(*apply_ltx(positive, negative, latent_in, vae, lats, latent_idx, guide_strength))
         ctx = ApplyContext(clip=clip, prompt=prompt or "", negative_prompt=negative_prompt or "",
                            positive=positive, negative=negative, ref_strength=float(ref_strength),
-                           ref_on_negative=bool(ref_on_negative))
+                           ref_on_negative=bool(ref_on_negative), edit_format=edit_format)
         pos, neg = h.build(h, ctx, lats, imgs)
-        empty = torch.zeros_like(lats[0]) if lats else torch.zeros([1, h.latent_channels, 64, 64], device=device)
+        shape = [1, h.latent_channels, 1, 64, 64] if h.key == "krea2" else [1, h.latent_channels, 64, 64]
+        empty = torch.zeros_like(lats[0]) if lats else torch.zeros(shape, device=device)
         return io.NodeOutput(pos, neg, {"samples": empty})
 
 

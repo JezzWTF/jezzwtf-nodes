@@ -74,6 +74,9 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 | Draw Image | Layered sketch pad that loads like Load Image, with pressure, undo and zoom |
 | Multi Load Image | Up to 16 image slots, each with its own output |
 | Mask Composite | Combine two masks at an offset with replace, add, subtract, multiply, min, max, difference or xor, plus opacity, inversion and a soft edge |
+| Mask Editor | Paint or erase masks against an image, with undo, zoom, saved paintings, inversion and feathering |
+| Image Compare | Wipe, blend, difference, toggle or mask comparison, with batch previews and MAE/PSNR metrics |
+| Image Saver (Smart Squeeze) | Save PNG, WebP, JPEG, AVIF or TIFF, with a quality-targeted compression search and an encoding report |
 | Gallery Load | Pick one or many images in a floating gallery window (input or output folders, folders, search) and load them as a batch |
 | Switch | Pick one of two inputs with a true/false switch; the output takes the connected type and only the chosen side is computed |
 | Route | Send one input to the true or the false output; nodes on the other output are skipped |
@@ -127,11 +130,13 @@ A RefMod is a `.safetensors` file of reference latents (portraits, a short clip,
 |---|---|
 | RefMod Bake (Character) / Loader / Apply | Bake references into a file, load it, and apply it with strength, curves and scramble |
 | Tail RefMod / Capture / Load | The same idea for continuing a clip from its tail |
-| Image RefMod Bake / Apply | References for Qwen Image 2.1, Fibo 2 and Flux 3 |
+| Image RefMod Bake / Apply | References for Qwen Image 2.1, Fibo 2, Flux 3, Flux.2, Flux Kontext, MOSS and Krea edit LoRAs, plus saved LTX image guides |
+| H3 Clip Doctor | Check H3 latent shapes, frame mapping and decoded media; optionally repair media size, duration and FPS metadata |
+| Reference Audition / Save Audition Selection | Compare a full RefMod bundle against individual omissions with fixed prompts, seed and target; inspect a labeled contact sheet, then save chosen references as a new bundle |
 | Refmod Character Card Baker | Put a character card into a refmod header, saved to `models/refmods` |
 | MiniMax H3 Image Edit | One-node H3 image edit |
 | H3 Upscale Picker | Same-scale target sizes for the H3 latent upscaler |
-| Ultimate KSampler / H3 KSampler | Samplers with live video preview |
+| Ultimate KSampler / H3 KSampler | Shared sampling backend with live preview, optional decode and advanced guider/noise/sampler inputs; H3 keeps its existing positive-only preset |
 | Model Preview Mirror | Pass-through that shows a sampler's live preview in its own panel |
 
 ## Audio
@@ -140,7 +145,7 @@ Category `JezzWTF/audio`.
 
 | Node | What it does |
 |---|---|
-| Audio Loader | Load an audio file from the input folder (subfolders included) with an upload button, a player, trim and mono mix |
+| Audio Loader | Load or upload audio with a player, waveform selection and scrubbing, trim fields and mono mix |
 | Album Cover | Embed an image as the cover art of an mp3, flac or m4a file, with optional title, artist and album tags |
 
 ## Video
@@ -187,6 +192,18 @@ Drag a file from [`example_workflows/`](example_workflows/) into ComfyUI.
 | `GIF_Optimise_and_Compare.json` | Load a GIF, re-encode it, and compare the result with the original: sizes, SSIM and a side-by-side | Nothing beyond core |
 | `Dataset_Captioning.json` | Caption a whole folder of images with Qwen3.5 and save a `.txt` next to each one, ready for LoRA training | Qwen3.5 |
 | `RefMod_Bake_and_Apply_H3.json` | Bake a character portrait into a RefMod, apply it to MiniMax H3 reference-to-video and generate a clip | MiniMax H3 reference model, text encoder and VAEs |
+| `RefMod_Bake_Image_Families.json` | Bake reusable image references; select Qwen, Fibo, Flux, MOSS or Krea and the matching VAE | Reference image and family-specific VAE |
+| `RefMod_Bake_LTX_Guide.json` | Fit and bake a 512×512 image guide for the LTX example | Reference image and LTX video VAE |
+| `RefMod_Apply_Qwen_Image_2_1.json` / `RefMod_Apply_Fibo_2.json` | Load a saved bundle, encode the prompt, sample and save an image | Saved bundle and matching model, text encoder and VAE |
+| `RefMod_Apply_Flux_Kontext.json` / `RefMod_Apply_Flux_2.json` / `RefMod_Apply_Flux_3.json` | Apply saved references to upstream text conditioning, sample and save | Saved bundle and matching model components |
+| `RefMod_Apply_MOSS_Image.json` / `RefMod_Apply_Krea_2.json` | Apply saved references with a model-only edit LoRA wired into sampling | Saved bundle, matching models and a reference-image edit LoRA |
+| `RefMod_Apply_LTX_Video.json` | Guide a video latent, sample with LTXVScheduler, crop guides and save a WebM | Saved 512×512 guide, ltx-video-2b-v0.9.5 checkpoint/VAE and T5 |
+| `RefMod_Reference_Audition.json` | Compare reference omissions, inspect influence and save a chosen subset without repeating cached renders | Saved Flux.2 bundle and matching model components; in-canvas notes explain adaptation to other families |
+| `RefMod_Diagnose_MOSS_Image.json` | Compare saved-reference and native MOSS editing with shared prompts, model, seed and target; report baked/fresh latent differences | Existing MOSS bundle, matching VAE, encoder, checkpoint and edit LoRA |
+| `RefMod_Character_New_Scene_Flux_2.json` | Use a saved person reference in a new full-body scene, with independent output dimensions; checked in full-weight generation | Flux.2 Klein Base 4B, Qwen3-4B, full Flux.2 VAE and a Flux.2 reference bundle |
+| `RefMod_Upscale_Refine_Flux_2.json` / `RefMod_Upscale_Refine_Flux_3.json` / `RefMod_Upscale_Refine_Flux_3_Distilled.json` | Enlarge a generated image and refine at low denoise while reapplying the saved references | Matching Base or explicitly named Distilled checkpoint, encoder, VAE and family-specific bundle; Flux 3 variants require separate generation validation |
+
+The new RefMod examples use separate bake and apply stages. Select your installed model files and saved bundle before running; each workflow includes setup notes. The existing [Example workflows guide](js/workspace/docs/example-workflows.md) covers the setup.
 
 # License
 

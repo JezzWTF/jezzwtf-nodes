@@ -1,12 +1,12 @@
 # Image RefMod Apply
 
-Apply saved RefMods to Qwen, Fibo or Flux image-edit conditioning, with the model detected from the RefMod or chosen by hand.
+Apply saved reference bundles with model-specific conditioning. MOSS and Krea require matching edit LoRAs. LTX image guides need a target video latent and core LTXVAddLatentGuide; crop guides with LTXV Crop Guides after sampling.
 
 ## Inputs
 
 | Parameter | Description | Data Type | Required | Range |
 |-----------|-------------|-----------|----------|-------|
-| `model` | Selects the target model family, with auto using the first selected RefMod's family. (default: `auto (from refmod)`) | COMBO | Yes | `"auto (from refmod)"`<br>`"qwen21"`<br>`"fibo2"`<br>`"flux3"` |
+| `model` | Selects the target model family, with auto using the first selected RefMod's family. (default: `auto (from refmod)`) | COMBO | Yes | `"auto (from refmod)"`<br>`"qwen21"`<br>`"fibo2"`<br>`"flux3"`<br>`"moss_image"`<br>`"krea2"`<br>`"flux_kontext"`<br>`"flux2"`<br>`"ltxv"` |
 | `refmod_1` | First saved reference bundle to load, or None to omit this slot. (default: `None`) | COMBO | Yes | choose from the list |
 | `clip` | Text encoder for model families that encode prompt text in this node. | CLIP | No |  |
 | `prompt` | Positive text used for model families that encode prompts directly. | STRING | No |  |
@@ -21,6 +21,10 @@ Apply saved RefMods to Qwen, Fibo or Flux image-edit conditioning, with the mode
 | `extra_image_scale` | How the extra image is sized: to the resolution setting, or to the pixel area of the first saved reference (its own aspect is kept). With no saved reference the resolution setting is used. (default: `keep aspect (resolution)`) | COMBO | No | `"keep aspect (resolution)"`<br>`"match first reference"` |
 | `ref_strength` | Fraction of the denoising schedule during which the references are active, for models that support scheduling. (default: 1.0) | FLOAT | No | 0 to 1 (step 0.01) |
 | `ref_on_negative` | Also attaches the references to negative conditioning on model families that support this option. (default: true) | BOOLEAN | No |  |
+| `edit_format` | MOSS/Krea edit LoRA training layout. Match kv_cache to the training configuration; Moss-Image-Edit is MOSS-only. (default: `ai-toolkit`) | COMBO | No | `"ai-toolkit"`<br>`"ai-toolkit (kv_cache off)"`<br>`"Moss-Image-Edit"`<br>`"Krea2 style reference"` |
+| `latent_in` | Target video latent for LTX guides; other families return an empty latent at the first reference's size. | LATENT | No |  |
+| `latent_idx` | LTX guide placement in latent frames, not pixel frames. (default: 0) | INT | No | -9999 to 9999 |
+| `guide_strength` | LTX guide strength; 0 passes the target latent through unchanged. (default: 1.0) | FLOAT | No | 0 to 1 (step 0.01) |
 
 ## Outputs
 
@@ -28,8 +32,8 @@ Apply saved RefMods to Qwen, Fibo or Flux image-edit conditioning, with the mode
 |-------------|-------------|-----------|
 | `positive` | Positive conditioning built for the selected model with the supplied references. | CONDITIONING |
 | `negative` | Negative conditioning with references attached when supported and enabled. | CONDITIONING |
-| `latent` | Empty latent shaped like the first reference, or a 64 by 64 latent grid when no references are supplied. | LATENT |
+| `latent` | For LTX, the target video latent with guide data appended; crop guides after sampling. For image families, an empty latent at the first reference's size, or a 64 by 64 grid without references. | LATENT |
 
 Notes:
 
-- More detail, including how this node fits with the others, is in the guide of the JezzWTF Documentation window (Alt+Shift+D).
+- More detail, including how this node fits with the others, is in the **Tail and Image RefMod** page of the JezzWTF Documentation window (Alt+Shift+D).

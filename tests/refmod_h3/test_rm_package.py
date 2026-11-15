@@ -25,6 +25,9 @@ EXPECTED = {
     "JWTFRefmodCardBaker": "Refmod Character Card Baker", "JWTFH3ImageEdit": "MiniMax H3 Image Edit",
     "JWTFUltimateKSampler": "Ultimate KSampler", "JWTFH3KSampler": "H3 KSampler",
     "JWTFH3UpscalePicker": "H3 Upscale Picker", "JWTFUltimateModelLoader": "Ultimate Model Loader",
+    "JWTFH3ClipDoctor": "H3 Clip Doctor",
+    "JWTFReferenceAudition": "Reference Audition", "JWTFSaveAuditionSelection": "Save Audition Selection",
+    "JWTFRefModConditioningCheck": "RefMod Conditioning Check (MOSS)",
 }
 
 

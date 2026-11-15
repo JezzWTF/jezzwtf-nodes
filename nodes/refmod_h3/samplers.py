@@ -1,6 +1,6 @@
 """Samplers with live preview: Ultimate KSampler and the CFG-free H3 KSampler (spec section 12).
 
-Both are output nodes sharing the preview wrapper (``preview.py``) and one frontend. They return
+Both are output nodes sharing execution, the preview wrapper (``preview.py``) and one frontend. They return
 ``(latent, denoised, image, audio)`` and ``ui.jezzwtf_source_id`` so a panel can follow the node.
 """
 from __future__ import annotations
@@ -89,6 +89,10 @@ def base_schedulers() -> list[str]:
 
 def sampler_choices() -> list[str]:
     return base_samplers() + [CLOWN_PREFIX + n for n in res4lyf_sampler_names()]
+
+
+def tiny_vae_choices() -> list[str]:
+    return ["none"] + sorted(set(n for n in _comfy.filename_list("vae_approx") if n and n != "none"), key=str.casefold)
 
 
 def scheduler_choices(include_res4lyf: bool = True) -> list[str]:
@@ -245,6 +249,104 @@ def run_custom_advanced(noise: object, guider: object, sampler: object, sigmas: 
     return _latent_pair(out)
 
 
+def guider_model_slot(guider: object | None) -> tuple[str | None, object | None]:
+    """Return the patcher's actual attribute so preview rebinding updates the right field."""
+    if guider is not None:
+        for attr in GUIDER_MODEL_ATTRS:
+            candidate = getattr(guider, attr, None)
+            if candidate is not None and hasattr(candidate, "clone") and hasattr(candidate, "add_wrapper_with_key"):
+                return attr, candidate
+    return None, None
+
+
+def run_sampler(*, model: object | None, positive: object | None, latent_image: Latent | None,
+                sampler_name: str, scheduler: str, steps: int, steps_to_run: int, cfg: float,
+                cfg_enabled: bool, denoise: float, seed: int, decode: bool, tiled_decode: bool,
+                preview_fps: int, unique_id: object, dynprompt: object, negative: object | None = None,
+                noise: object | None = None, guider: object | None = None, sampler: object | None = None,
+                sigmas: torch.Tensor | None = None, vae: object | None = None, audio_vae: object | None = None,
+                eta: float = 0.5, sampler_mode: str = "standard", bongmath: bool = True, options: object | None = None,
+                preview: bool = True, preview_max_res: int = 1024, preview_frames: int = 1,
+                preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none", allow_clown: bool = True) -> io.NodeOutput:
+    """Shared execution for Ultimate and the stable H3 preset. Wired inputs own sampling."""
+    emit_phase(unique_id, dynprompt, "sampling")
+    if latent_image is None:
+        raise RefModError("connect a latent_image")
+    is_clown = sampler_name.startswith(CLOWN_PREFIX)
+    if is_clown and not allow_clown:
+        raise RefModError("H3 KSampler uses built-in samplers; use Ultimate KSampler for RES4LYF")
+    if is_clown and any(value is not None for value in (noise, guider, sampler)):
+        raise RefModError("RES4LYF cannot use external noise, guider or sampler inputs; disconnect them or select a built-in sampler")
+    attr, guided = guider_model_slot(guider)
+    base = guided if guider is not None else model
+    sigma_model = model if model is not None else guided
+    if guider is None:
+        if model is None:
+            raise RefModError("connect a model or a guider")
+        if positive is None:
+            raise RefModError("connect a guider or a positive conditioning")
+    elif sigma_model is None and sigmas is None:
+        raise RefModError("a guider without a model needs sigmas (the schedule cannot be computed)")
+    if scheduler == "none" and sigmas is None:
+        raise RefModError("scheduler is 'none' but no sigmas are connected")
+    if not is_clown and sigmas is None and denoise <= 0:
+        return finish(latent_image, latent_image, decode, vae, audio_vae, tiled_decode, unique_id, dynprompt)
+    if guider is not None and base is None:
+        if preview:
+            log.warning("sampler: no guider model to attach the preview to; running without preview")
+        preview = False
+    work_model = base
+    if base is not None:
+        work_model = _maybe_preview(base, preview, preview_max_res, preview_jpeg_quality, preview_frames,
+                                    preview_fps, preview_tiny_vae, vae, audio_vae, unique_id, dynprompt)
+    run_guider = guider
+    if guider is not None and attr is not None and work_model is not base:
+        try:
+            run_guider = copy.copy(guider)
+            setattr(run_guider, attr, work_model)
+        except Exception as exc:
+            log.warning("sampler: could not attach the preview to the guider (%s)", exc)
+            run_guider = guider
+    use_cfg = bool(cfg_enabled) and negative is not None
+    if negative is None:
+        negative = positive
+    if is_clown:
+        clown = res4lyf_sampler_class()
+        if clown is None:
+            raise RefModError("a 'clown:' sampler needs the RES4LYF node pack, which is not loaded")
+        outputs = _comfy.call_node(
+            clown, model=work_model, positive=positive, negative=negative, latent_image=latent_image,
+            sampler_name=sampler_name[len(CLOWN_PREFIX):],
+            scheduler=PLACEHOLDER_SCHEDULER if scheduler == "none" else scheduler, steps=int(steps),
+            steps_to_run=int(steps_to_run), denoise=float(denoise), cfg=float(cfg) if use_cfg else 1.0,
+            seed=int(seed), eta=float(eta), sampler_mode=sampler_mode, bongmath=bool(bongmath), sigmas=sigmas,
+            options_group={"options0": options} if options is not None else None)
+        latent, denoised = _latent_pair(outputs)
+    elif any(value is not None for value in (noise, guider, sampler, sigmas)) or not use_cfg or steps_to_run >= 1:
+        core = _custom_core()
+        if noise is None:
+            noise = _comfy.call_node(getattr(core, "RandomNoise"), noise_seed=int(seed))[0]
+        if run_guider is None:
+            if use_cfg:
+                run_guider = _comfy.call_node(getattr(core, "CFGGuider"), model=work_model, positive=positive,
+                                              negative=negative, cfg=float(cfg))[0]
+            else:
+                run_guider = _comfy.call_node(getattr(core, "BasicGuider"), model=work_model, conditioning=positive)[0]
+        if sampler is None:
+            sampler = _comfy.call_node(getattr(core, "KSamplerSelect"), sampler_name=sampler_name)[0]
+        if sigmas is None:
+            sigmas = widget_sigmas(sigma_model, real_scheduler(scheduler), int(steps), float(denoise))
+        latent, denoised = run_custom_advanced(noise, run_guider, sampler, trim_sigmas(sigmas, int(steps_to_run)), latent_image)
+    else:
+        nodes = _comfy.comfy_nodes()
+        if nodes is None:
+            raise RefModError("ComfyUI's nodes module is unavailable")
+        outputs = nodes.common_ksampler(work_model, int(seed), int(steps), float(cfg), sampler_name,
+                                        real_scheduler(scheduler), positive, negative, latent_image, denoise=float(denoise))
+        latent, denoised = _latent_pair(tuple(outputs))
+    return finish(latent, denoised, bool(decode), vae, audio_vae, bool(tiled_decode), unique_id, dynprompt)
+
+
 # --------------------------------------------------------------------------- Ultimate KSampler
 
 class JWTFUltimateKSampler(io.ComfyNode):
@@ -254,10 +356,10 @@ class JWTFUltimateKSampler(io.ComfyNode):
             node_id="JWTFUltimateKSampler",
             display_name='Ultimate KSampler',
             category='JezzWTF/sampling',
-            description='KSampler with live preview, chained step runs, RES4LYF dispatch and optional decode.',
+            description='Sampler with optional guider/noise/sampler/sigmas overrides, live preview, partial step runs, RES4LYF and optional decode. Disable CFG for positive-only sampling; CFG=0 keeps its numeric meaning.',
             inputs=[
-                io.Model.Input("model", tooltip="Diffusion model used for sampling and optional live previews."),
-                io.Conditioning.Input("positive", tooltip="Positive conditioning passed to the sampling guider."),
+                io.Model.Input("model", optional=True, tooltip="Required without a guider. With a guider, an explicitly connected model supplies the widget-generated sigma schedule."),
+                io.Conditioning.Input("positive", optional=True, tooltip="Required without a guider. A wired guider carries its own conditioning."),
                 io.Latent.Input("latent_image", tooltip="Starting image, video or audio-video latent to denoise."),
                 io.Combo.Input("sampler_name", options=sampler_choices(), default='euler', tooltip="Sampling algorithm, with clown-prefixed choices delegated to RES4LYF when installed."),
                 io.Combo.Input("scheduler", options=scheduler_choices(), default='beta', tooltip="Noise schedule used when no custom sigmas are connected."),
@@ -282,7 +384,10 @@ class JWTFUltimateKSampler(io.ComfyNode):
                 io.Int.Input("preview_max_res", default=1024, min=0, max=8192, step=8, optional=True, tooltip="Maximum preview edge in pixels, with 0 disabling the resolution limit."),
                 io.Int.Input("preview_frames", default=1, min=1, max=1024, optional=True, tooltip="Maximum number of frames in each preview update, with 1 showing a still image."),
                 io.Int.Input("preview_jpeg_quality", default=80, min=30, max=100, optional=True, tooltip="JPEG compression quality for live preview frames on a scale from 30 to 100."),
-                io.Combo.Input("preview_tiny_vae", options=['none'], default='none', optional=True, tooltip="Selects a tiny preview decoder, with the current None option using the normal preview fallback."),
+                io.Combo.Input("preview_tiny_vae", options=tiny_vae_choices(), default='none', optional=True, tooltip="Installed decoder from models/vae_approx; none uses the normal preview fallback. Match the decoder to the model family."),
+                io.Noise.Input("noise", optional=True, tooltip="Built-in samplers: overrides the seed widget. Not supported by RES4LYF clown samplers."),
+                io.Guider.Input("guider", optional=True, tooltip="Built-in samplers: carries model and conditioning, overriding positive, negative and CFG widgets. Not supported by RES4LYF."),
+                io.Sampler.Input("sampler", optional=True, tooltip="Built-in samplers: overrides the sampler picker. Not supported by RES4LYF."),
             ],
             outputs=[
                 io.Latent.Output("latent", tooltip="Sampled latent at the end of the executed schedule."),
@@ -295,77 +400,31 @@ class JWTFUltimateKSampler(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, model: object, positive: object, latent_image: Latent, sampler_name: str, scheduler: str,
-               steps: int, steps_to_run: int, cfg: float, cfg_enabled: bool, denoise: float, seed: int,
-               eta: float, sampler_mode: str, bongmath: bool, decode: bool, tiled_decode: bool,
-               preview_fps: int, negative: object | None = None, vae: object | None = None,
+    def execute(cls, model: object | None = None, positive: object | None = None, latent_image: Latent | None = None,
+               sampler_name: str = "euler", scheduler: str = "beta", steps: int = 30, steps_to_run: int = -1,
+               cfg: float = 5.5, cfg_enabled: bool = True, denoise: float = 1.0, seed: int = 0,
+               eta: float = 0.5, sampler_mode: str = "standard", bongmath: bool = True, decode: bool = True,
+               tiled_decode: bool = False, preview_fps: int = 12, negative: object | None = None, vae: object | None = None,
                audio_vae: object | None = None, sigmas: torch.Tensor | None = None,
                options: object | None = None, preview: bool = True, preview_max_res: int = 1024,
-               preview_frames: int = 1, preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none") -> io.NodeOutput:
-        unique_id = cls.hidden.unique_id
-        dynprompt = cls.hidden.dynprompt
-        emit_phase(unique_id, dynprompt, "sampling")
-        use_cfg = bool(cfg_enabled)
-        if negative is None:
-            negative = positive
-            use_cfg = False
-        model = _maybe_preview(model, preview, preview_max_res, preview_jpeg_quality, preview_frames,
-                               preview_fps, preview_tiny_vae, vae, audio_vae, unique_id, dynprompt)
-        if scheduler == "none" and sigmas is None:
-            raise RefModError("scheduler is 'none' but no sigmas are connected")
-        latent, denoised = cls._dispatch(model, positive, negative, latent_image, sampler_name, scheduler,
-                                          int(steps), int(steps_to_run), float(cfg), use_cfg, float(denoise),
-                                          int(seed), float(eta), sampler_mode, bool(bongmath), sigmas, options)
-        return finish(latent, denoised, bool(decode), vae, audio_vae, bool(tiled_decode), unique_id, dynprompt)
-
-    @staticmethod
-    def _dispatch(model: object, positive: object, negative: object, latent_image: Latent, sampler_name: str,
-                  scheduler: str, steps: int, steps_to_run: int, cfg: float, use_cfg: bool, denoise: float,
-                  seed: int, eta: float, sampler_mode: str, bongmath: bool, sigmas: torch.Tensor | None,
-                  options: object | None) -> tuple[Latent, Latent | None]:
-        sched = real_scheduler(scheduler)
-        if sampler_name.startswith(CLOWN_PREFIX):
-            cls = res4lyf_sampler_class()
-            if cls is None:
-                raise RefModError("a 'clown:' sampler needs the RES4LYF node pack, which is not loaded")
-            out = _comfy.call_node(
-                cls, model=model, positive=positive, negative=negative, latent_image=latent_image,
-                sampler_name=sampler_name[len(CLOWN_PREFIX):],
-                scheduler=PLACEHOLDER_SCHEDULER if scheduler == "none" else scheduler, steps=steps,
-                steps_to_run=steps_to_run, denoise=denoise, cfg=cfg if use_cfg else 1.0, seed=seed, eta=eta,
-                sampler_mode=sampler_mode, bongmath=bongmath, sigmas=sigmas,
-                options_group={"options0": options} if options is not None else None)
-            return _latent_pair(out)
-        if sigmas is not None or not use_cfg or steps_to_run >= 1:
-            core = _custom_core()
-            noise = _comfy.call_node(getattr(core, "RandomNoise"), noise_seed=seed)[0]
-            if use_cfg:
-                guider = _comfy.call_node(getattr(core, "CFGGuider"), model=model, positive=positive,
-                                          negative=negative, cfg=cfg)[0]
-            else:
-                guider = _comfy.call_node(getattr(core, "BasicGuider"), model=model, conditioning=positive)[0]
-            sampler = _comfy.call_node(getattr(core, "KSamplerSelect"), sampler_name=sampler_name)[0]
-            run_sigmas = sigmas if sigmas is not None else widget_sigmas(model, sched, steps, denoise)
-            return run_custom_advanced(noise, guider, sampler, trim_sigmas(run_sigmas, steps_to_run), latent_image)
-        nodes = _comfy.comfy_nodes()
-        if nodes is None:
-            raise RefModError("ComfyUI's nodes module is unavailable")
-        out = nodes.common_ksampler(model, seed, steps, cfg, sampler_name, sched, positive, negative,
-                                    latent_image, denoise=denoise)
-        return _latent_pair(tuple(out))
+               preview_frames: int = 1, preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none",
+               noise: object | None = None, guider: object | None = None, sampler: object | None = None) -> io.NodeOutput:
+        return run_sampler(
+            model=model, positive=positive, negative=negative, latent_image=latent_image,
+            sampler_name=sampler_name, scheduler=scheduler, steps=steps, steps_to_run=steps_to_run,
+            cfg=cfg, cfg_enabled=cfg_enabled, denoise=denoise, seed=seed, eta=eta,
+            sampler_mode=sampler_mode, bongmath=bongmath, options=options, decode=decode,
+            tiled_decode=tiled_decode, preview_fps=preview_fps, vae=vae, audio_vae=audio_vae,
+            sigmas=sigmas, noise=noise, guider=guider, sampler=sampler, preview=preview,
+            preview_max_res=preview_max_res, preview_frames=preview_frames,
+            preview_jpeg_quality=preview_jpeg_quality, preview_tiny_vae=preview_tiny_vae,
+            unique_id=cls.hidden.unique_id, dynprompt=cls.hidden.dynprompt)
 
 
 # --------------------------------------------------------------------------- H3 KSampler
 
 def guider_model(guider: object | None) -> object | None:
-    """The model patcher inside a guider: first attribute that can be cloned and wrapped."""
-    if guider is None:
-        return None
-    for attr in GUIDER_MODEL_ATTRS:
-        cand = getattr(guider, attr, None)
-        if cand is not None and hasattr(cand, "clone") and hasattr(cand, "add_wrapper_with_key"):
-            return cand
-    return None
+    return guider_model_slot(guider)[1]
 
 
 class JWTFH3KSampler(io.ComfyNode):
@@ -375,7 +434,7 @@ class JWTFH3KSampler(io.ComfyNode):
             node_id="JWTFH3KSampler",
             display_name='H3 KSampler',
             category='JezzWTF/sampling',
-            description='CFG-free SamplerCustomAdvanced-shaped sampler for MiniMax H3 with live preview.',
+            description='H3 compatibility preset using the shared sampler backend: eight steps by default and positive-only guidance unless an external guider is supplied. Existing sockets and widget order are preserved.',
             inputs=[
                 io.Latent.Input("latent_image", tooltip="Starting image, video or audio-video latent to denoise."),
                 io.Combo.Input("sampler_name", options=base_samplers(), default='euler', tooltip="Sampling algorithm used when no external sampler is connected."),
@@ -399,7 +458,7 @@ class JWTFH3KSampler(io.ComfyNode):
                 io.Int.Input("preview_max_res", default=1024, min=0, max=8192, step=8, optional=True, tooltip="Maximum preview edge in pixels, with 0 disabling the resolution limit."),
                 io.Int.Input("preview_frames", default=1, min=1, max=1024, optional=True, tooltip="Maximum number of frames in each preview update, with 1 showing a still image."),
                 io.Int.Input("preview_jpeg_quality", default=80, min=30, max=100, optional=True, tooltip="JPEG compression quality for live preview frames on a scale from 30 to 100."),
-                io.Combo.Input("preview_tiny_vae", options=['none'], default='none', optional=True, tooltip="Selects a tiny preview decoder, with the current None option using the normal preview fallback."),
+                io.Combo.Input("preview_tiny_vae", options=tiny_vae_choices(), default='none', optional=True, tooltip="Installed decoder from models/vae_approx; none uses the normal preview fallback. Match the decoder to the model family."),
             ],
             outputs=[
                 io.Latent.Output("latent", tooltip="Sampled latent at the end of the executed schedule."),
@@ -419,53 +478,15 @@ class JWTFH3KSampler(io.ComfyNode):
                positive: object | None = None, vae: object | None = None, audio_vae: object | None = None,
                preview: bool = True, preview_max_res: int = 1024, preview_frames: int = 1,
                preview_jpeg_quality: int = 80, preview_tiny_vae: str = "none") -> io.NodeOutput:
-        unique_id = cls.hidden.unique_id
-        dynprompt = cls.hidden.dynprompt
-        emit_phase(unique_id, dynprompt, "sampling")
-        # The preview must wrap the model the guider actually samples (it carries its LoRA/refmod patches);
-        # the ``model`` input is only a fallback and the source of the sigma schedule.
-        guided = guider_model(guider)
-        base = guided if guided is not None else (model if guider is None else None)
-        sigma_model = model if model is not None else guided
-        do_preview = bool(preview)
-        if guider is None and model is None:
-            raise RefModError("connect a model or a guider")
-        if base is None:
-            if sigmas is None and sigma_model is None:
-                raise RefModError("a guider without a model needs sigmas (the schedule cannot be computed)")
-            log.warning("H3 KSampler: no guider model to attach the preview to; running without preview")
-            do_preview = False
-        if guider is None and positive is None:
-            raise RefModError("connect a guider or a positive conditioning")
-        preview_model: object | None = None
-        if base is not None and do_preview:
-            preview_model = _maybe_preview(base, do_preview, preview_max_res, preview_jpeg_quality,
-                                           preview_frames, preview_fps, preview_tiny_vae, vae, audio_vae,
-                                           unique_id, dynprompt)
-        core = _custom_core()
-        run_guider = guider
-        if guider is not None and preview_model is not None and preview_model is not base:
-            try:
-                run_guider = copy.copy(guider)
-                setattr(run_guider, "model_patcher", preview_model)
-            except Exception as exc:
-                log.warning("H3 KSampler: could not attach the preview to the guider (%s)", exc)
-                run_guider = guider
-        if noise is None:
-            noise = _comfy.call_node(getattr(core, "RandomNoise"), noise_seed=int(seed))[0]
-        if run_guider is None:
-            run_guider = _comfy.call_node(getattr(core, "BasicGuider"), model=preview_model or base,
-                                          conditioning=positive)[0]
-        if sampler is None:
-            sampler = _comfy.call_node(getattr(core, "KSamplerSelect"), sampler_name=sampler_name)[0]
-        if sigmas is None:
-            if scheduler == "none":
-                raise RefModError("scheduler is 'none' but no sigmas are connected")
-            assert sigma_model is not None
-            sigmas = widget_sigmas(sigma_model, real_scheduler(scheduler), int(steps), float(denoise))
-        latent, denoised = run_custom_advanced(noise, run_guider, sampler, trim_sigmas(sigmas, int(steps_to_run)),
-                                               latent_image)
-        return finish(latent, denoised, bool(decode), vae, audio_vae, bool(tiled_decode), unique_id, dynprompt)
+        return run_sampler(
+            model=model, positive=positive, latent_image=latent_image, sampler_name=sampler_name,
+            scheduler=scheduler, steps=steps, steps_to_run=steps_to_run, cfg=1.0, cfg_enabled=False,
+            denoise=denoise, seed=seed, decode=decode, tiled_decode=tiled_decode,
+            preview_fps=preview_fps, noise=noise, guider=guider, sampler=sampler, sigmas=sigmas,
+            vae=vae, audio_vae=audio_vae, preview=preview, preview_max_res=preview_max_res,
+            preview_frames=preview_frames, preview_jpeg_quality=preview_jpeg_quality,
+            preview_tiny_vae=preview_tiny_vae, unique_id=cls.hidden.unique_id,
+            dynprompt=cls.hidden.dynprompt, allow_clown=False)
 
 
 NODES = [JWTFUltimateKSampler, JWTFH3KSampler]

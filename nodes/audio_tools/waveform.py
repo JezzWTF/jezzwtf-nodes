@@ -54,9 +54,9 @@ def register_routes() -> None:
     try:
         from server import PromptServer
         instance = PromptServer.instance
-    except (ImportError, AttributeError):
+    except Exception:  # noqa: BLE001 - outside ComfyUI, or its server module cannot load
         return
-    if getattr(instance, "_jwtf_audio_waveform", False):
+    if instance is None or getattr(instance, "_jwtf_audio_waveform", False):
         return
     try:
         from ..utility_core._comfy import is_loopback_request

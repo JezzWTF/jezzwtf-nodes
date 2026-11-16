@@ -1,0 +1,1674 @@
+{
+  "id": "f7a25c78-6aee-5d8b-8060-9a5a2e1b1762",
+  "revision": 0,
+  "last_node_id": 27,
+  "last_link_id": 37,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        560,
+        840
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup and selection behaviour",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Smart selection with native WeVisOne\n\nChoose an image and install/select wevisone_vl_2b_int8_convrot.safetensors from Comfy-Org/WeVisOne-VL. CLIPLoader uses stable_diffusion as its type: current core auto-detects the WeVisOne architecture from the weights. This is a perception model, not the generator's text encoder.\n\nSmart Select can select face, person, hair or other descriptions. Segmentation returns alpha mattes; detection returns rectangular masks. Largest selects one match per image. Index uses the native detector's zero-based order; inspect the report when several subjects match. All keeps every match. No match yields an empty mask and no boxes; Region Crop stops rather than silently refining the whole image.\n\nMask Editor lets you correct the incoming selection after a first run. A saved painting overrides the incoming mask until Use input mask is clicked. Clear saves an all-black painting. If painting outside a selected box, disconnect the boxes from Region Crop to derive the crop bounds from the edited mask instead.\n\n# Face-region refinement\n\nSelect a Flux.2 reference bundle and matching Klein Base 4B components, including the matching VAE. The original scene prompt guides refinement. The selected face is padded and enlarged to a 768-pixel long edge on a 16-pixel grid. Its VAE-encoded pixels feed the sampler; references remain active throughout. The whole padded crop is sampled. The soft selection mask is applied only at pasteback: using that fractional matte as a latent noise mask repeatedly suppresses changes during sampling. Denoise 0.20 is a conservative redraw, not guaranteed restoration. Compare the crop at working resolution. 0.35 produces stronger changes but can alter facial features or tattoo details.\n\nRegion Composite restores the crop's original size and blends it into the SAME original source image. The output stays at the source image's resolution. Only the chosen frame/region is changed; other pixels and alpha are preserved. Use an enlarged input first if you also want the whole output at a higher resolution. Inspect the mask, crop and before/after comparison; face detection is not identity recognition and refinement cannot guarantee exact identity."
+      ],
+      "widgets_values_named": {
+        "text": "# Smart selection with native WeVisOne\n\nChoose an image and install/select wevisone_vl_2b_int8_convrot.safetensors from Comfy-Org/WeVisOne-VL. CLIPLoader uses stable_diffusion as its type: current core auto-detects the WeVisOne architecture from the weights. This is a perception model, not the generator's text encoder.\n\nSmart Select can select face, person, hair or other descriptions. Segmentation returns alpha mattes; detection returns rectangular masks. Largest selects one match per image. Index uses the native detector's zero-based order; inspect the report when several subjects match. All keeps every match. No match yields an empty mask and no boxes; Region Crop stops rather than silently refining the whole image.\n\nMask Editor lets you correct the incoming selection after a first run. A saved painting overrides the incoming mask until Use input mask is clicked. Clear saves an all-black painting. If painting outside a selected box, disconnect the boxes from Region Crop to derive the crop bounds from the edited mask instead.\n\n# Face-region refinement\n\nSelect a Flux.2 reference bundle and matching Klein Base 4B components, including the matching VAE. The original scene prompt guides refinement. The selected face is padded and enlarged to a 768-pixel long edge on a 16-pixel grid. Its VAE-encoded pixels feed the sampler; references remain active throughout. The whole padded crop is sampled. The soft selection mask is applied only at pasteback: using that fractional matte as a latent noise mask repeatedly suppresses changes during sampling. Denoise 0.20 is a conservative redraw, not guaranteed restoration. Compare the crop at working resolution. 0.35 produces stronger changes but can alter facial features or tattoo details.\n\nRegion Composite restores the crop's original size and blends it into the SAME original source image. The output stays at the source image's resolution. Only the chosen frame/region is changed; other pixels and alpha are preserved. Use an enlarged input first if you also want the whole output at a higher resolution. Inspect the mask, crop and before/after comparison; face detection is not identity recognition and refinement cannot guarantee exact identity."
+      }
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        960
+      ],
+      "size": [
+        450,
+        500
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2,
+            3,
+            6,
+            32,
+            36
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Source image",
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png"
+      ],
+      "widgets_values_named": {
+        "image": "example.png"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1550
+      ],
+      "size": [
+        450,
+        160
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "WeVisOne perception model - separate from generator CLIP",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "wevisone_vl_2b_int8_convrot.safetensors",
+        "stable_diffusion",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "wevisone_vl_2b_int8_convrot.safetensors",
+        "type": "stable_diffusion",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "JWTFSmartSelect",
+      "pos": [
+        680,
+        40
+      ],
+      "size": [
+        430,
+        310
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        },
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "bboxes",
+          "type": "BOUNDING_BOX",
+          "links": [
+            7
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            5
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Describe the region to select",
+      "properties": {
+        "Node name for S&R": "JWTFSmartSelect"
+      },
+      "widgets_values": [
+        "face",
+        "segmentation",
+        "largest",
+        0,
+        1024
+      ],
+      "widgets_values_named": {
+        "query": "face",
+        "task": "segmentation",
+        "selection": "largest",
+        "selection_index": 0,
+        "max_length": 1024
+      }
+    },
+    {
+      "id": 5,
+      "type": "JWTFMaskEditor",
+      "pos": [
+        1180,
+        40
+      ],
+      "size": [
+        650,
+        700
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 4,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            8
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "mask_image",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "title": "Review or correct the incoming mask",
+      "properties": {
+        "Node name for S&R": "JWTFMaskEditor"
+      },
+      "widgets_values": [
+        "",
+        false,
+        0
+      ],
+      "widgets_values_named": {
+        "painted_mask": "",
+        "invert": false,
+        "feather": 0
+      }
+    },
+    {
+      "id": 6,
+      "type": "PreviewAny",
+      "pos": [
+        680,
+        440
+      ],
+      "size": [
+        440,
+        400
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Detection and selection report",
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 7,
+      "type": "JWTFRegionCrop",
+      "pos": [
+        1900,
+        40
+      ],
+      "size": [
+        400,
+        240
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "bboxes",
+          "type": "BOUNDING_BOX",
+          "link": 7,
+          "shape": 7
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 8,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "crop",
+          "type": "IMAGE",
+          "links": [
+            9,
+            14,
+            16,
+            30
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "crop_mask",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "region",
+          "type": "JWTF_IMAGE_REGION",
+          "links": [
+            33
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Enlarge the selected face with context",
+      "properties": {
+        "Node name for S&R": "JWTFRegionCrop"
+      },
+      "widgets_values": [
+        0,
+        0,
+        0.25,
+        768
+      ],
+      "widgets_values_named": {
+        "image_index": 0,
+        "region_index": 0,
+        "padding": 0.25,
+        "long_edge": 768
+      }
+    },
+    {
+      "id": 8,
+      "type": "PreviewImage",
+      "pos": [
+        1900,
+        380
+      ],
+      "size": [
+        450,
+        520
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Crop to be refined",
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 9,
+      "type": "UNETLoader",
+      "pos": [
+        680,
+        980
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            20
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Flux.2 Klein Base 4B",
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "flux-2-klein-base-4b.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "flux-2-klein-base-4b.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 10,
+      "type": "CLIPLoader",
+      "pos": [
+        680,
+        1190
+      ],
+      "size": [
+        360,
+        160
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            10,
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Generation text encoder",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen_3_4b.safetensors",
+        "flux2",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen_3_4b.safetensors",
+        "type": "flux2",
+        "device": "default"
+      }
+    },
+    {
+      "id": 11,
+      "type": "VAELoader",
+      "pos": [
+        680,
+        1440
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            15,
+            29
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Matching VAE for crop encoding and decode",
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "flux2-vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    {
+      "id": 12,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1180,
+        860
+      ],
+      "size": [
+        500,
+        240
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Original scene prompt and desired face detail",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A natural photograph of the person shown in the reference images, seated at a cafe table in a blue shirt, holding a coffee cup. Preserve the facial features, expression and facial markings, with natural skin and beard texture."
+      ],
+      "widgets_values_named": {
+        "text": "A natural photograph of the person shown in the reference images, seated at a cafe table in a blue shirt, holding a coffee cup. Preserve the facial features, expression and facial markings, with natural skin and beard texture."
+      }
+    },
+    {
+      "id": 13,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1180,
+        1190
+      ],
+      "size": [
+        440,
+        150
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Negative",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 14,
+      "type": "JWTFUnifiedRefModApply",
+      "pos": [
+        2400,
+        40
+      ],
+      "size": [
+        450,
+        900
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 12,
+          "shape": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 13,
+          "shape": 7
+        },
+        {
+          "name": "extra_image",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "latent_in",
+          "type": "LATENT",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            21
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            22
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "title": "Saved references for the person",
+      "properties": {
+        "Node name for S&R": "JWTFUnifiedRefModApply"
+      },
+      "widgets_values": [
+        "auto (from refmod)",
+        "None",
+        "",
+        "",
+        "None",
+        "None",
+        1024,
+        "keep aspect (resolution)",
+        1.0,
+        true,
+        "ai-toolkit",
+        0,
+        1.0
+      ],
+      "widgets_values_named": {
+        "model": "auto (from refmod)",
+        "refmod_1": "None",
+        "prompt": "",
+        "negative_prompt": "",
+        "refmod_2": "None",
+        "refmod_3": "None",
+        "extra_image_resolution": 1024,
+        "extra_image_scale": "keep aspect (resolution)",
+        "ref_strength": 1.0,
+        "ref_on_negative": true,
+        "edit_format": "ai-toolkit",
+        "latent_idx": 0,
+        "guide_strength": 1.0
+      }
+    },
+    {
+      "id": 15,
+      "type": "VAEEncode",
+      "pos": [
+        1900,
+        1000
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 14
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            27
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Encode the actual face crop",
+      "properties": {
+        "Node name for S&R": "VAEEncode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 16,
+      "type": "GetImageSize",
+      "pos": [
+        1900,
+        1230
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": [
+            17
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": [
+            18
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "batch_size",
+          "type": "INT",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "title": "Actual crop dimensions",
+      "properties": {
+        "Node name for S&R": "GetImageSize"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 17,
+      "type": "Flux2Scheduler",
+      "pos": [
+        2920,
+        980
+      ],
+      "size": [
+        360,
+        230
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "link": 17,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": 18,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_SIGMAS_",
+          "type": "SIGMAS",
+          "links": [
+            19
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Size-aware full schedule",
+      "properties": {
+        "Node name for S&R": "Flux2Scheduler"
+      },
+      "widgets_values": [
+        100,
+        768,
+        768
+      ],
+      "widgets_values_named": {
+        "steps": 100,
+        "width": 768,
+        "height": 768
+      }
+    },
+    {
+      "id": 18,
+      "type": "SplitSigmasDenoise",
+      "pos": [
+        2920,
+        1300
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "high_sigmas",
+          "type": "SIGMAS",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "low_sigmas",
+          "type": "SIGMAS",
+          "links": [
+            26
+          ],
+          "slot_index": 1
+        }
+      ],
+      "title": "Low-noise refinement strength",
+      "properties": {
+        "Node name for S&R": "SplitSigmasDenoise"
+      },
+      "widgets_values": [
+        0.2
+      ],
+      "widgets_values_named": {
+        "denoise": 0.2
+      }
+    },
+    {
+      "id": 19,
+      "type": "RandomNoise",
+      "pos": [
+        2920,
+        40
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_NOISE_",
+          "type": "NOISE",
+          "links": [
+            23
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Refinement seed",
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        7,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "noise_seed": 7,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 20,
+      "type": "KSamplerSelect",
+      "pos": [
+        2920,
+        230
+      ],
+      "size": [
+        360,
+        110
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_0_SAMPLER_",
+          "type": "SAMPLER",
+          "links": [
+            24
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Euler",
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 21,
+      "type": "CFGGuider",
+      "pos": [
+        2920,
+        430
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 20
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 21
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_0_GUIDER_",
+          "type": "GUIDER",
+          "links": [
+            25
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Reference-conditioned face refinement",
+      "properties": {
+        "Node name for S&R": "CFGGuider"
+      },
+      "widgets_values": [
+        5.0
+      ],
+      "widgets_values_named": {
+        "cfg": 5.0
+      }
+    },
+    {
+      "id": 22,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        3370,
+        40
+      ],
+      "size": [
+        360,
+        280
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 23
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 25
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 24
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 26
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 27
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            28
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Refine crop pixels",
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 23,
+      "type": "VAEDecode",
+      "pos": [
+        3370,
+        440
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 28
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 29
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            31,
+            34
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Decode refined face",
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 24,
+      "type": "JWTFImageCompare",
+      "pos": [
+        3370,
+        1250
+      ],
+      "size": [
+        650,
+        750
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 30
+        },
+        {
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 31
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "difference",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "metrics",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Enlarged input versus sampled crop - inspect actual detail",
+      "properties": {
+        "Node name for S&R": "JWTFImageCompare"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 25,
+      "type": "JWTFRegionComposite",
+      "pos": [
+        3810,
+        40
+      ],
+      "size": [
+        440,
+        200
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "name": "refined_crop",
+          "type": "IMAGE",
+          "link": 34
+        },
+        {
+          "name": "region",
+          "type": "JWTF_IMAGE_REGION",
+          "link": 33
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            35,
+            37
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "blend_mask",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Blend back into the original image",
+      "properties": {
+        "Node name for S&R": "JWTFRegionComposite"
+      },
+      "widgets_values": [
+        16,
+        1.0
+      ],
+      "widgets_values_named": {
+        "feather": 16,
+        "opacity": 1.0
+      }
+    },
+    {
+      "id": 26,
+      "type": "SaveImage",
+      "pos": [
+        4330,
+        40
+      ],
+      "size": [
+        450,
+        600
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 35
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Save region-refined image",
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "refmods/face_refine"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "refmods/face_refine"
+      }
+    },
+    {
+      "id": 27,
+      "type": "JWTFImageCompare",
+      "pos": [
+        3810,
+        430
+      ],
+      "size": [
+        650,
+        650
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 36
+        },
+        {
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 37
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "difference",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "metrics",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Original versus face-refined",
+      "properties": {
+        "Node name for S&R": "JWTFImageCompare"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      2,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      3,
+      2,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      1,
+      "MASK"
+    ],
+    [
+      5,
+      4,
+      2,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      2,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      4,
+      1,
+      7,
+      1,
+      "BOUNDING_BOX"
+    ],
+    [
+      8,
+      5,
+      1,
+      7,
+      2,
+      "MASK"
+    ],
+    [
+      9,
+      7,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      10,
+      0,
+      12,
+      0,
+      "CLIP"
+    ],
+    [
+      11,
+      10,
+      0,
+      13,
+      0,
+      "CLIP"
+    ],
+    [
+      12,
+      12,
+      0,
+      14,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      13,
+      13,
+      0,
+      14,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      14,
+      7,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      15,
+      11,
+      0,
+      15,
+      1,
+      "VAE"
+    ],
+    [
+      16,
+      7,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ],
+    [
+      17,
+      16,
+      0,
+      17,
+      0,
+      "INT"
+    ],
+    [
+      18,
+      16,
+      1,
+      17,
+      1,
+      "INT"
+    ],
+    [
+      19,
+      17,
+      0,
+      18,
+      0,
+      "SIGMAS"
+    ],
+    [
+      20,
+      9,
+      0,
+      21,
+      0,
+      "MODEL"
+    ],
+    [
+      21,
+      14,
+      0,
+      21,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      22,
+      14,
+      1,
+      21,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      23,
+      19,
+      0,
+      22,
+      0,
+      "NOISE"
+    ],
+    [
+      24,
+      20,
+      0,
+      22,
+      2,
+      "SAMPLER"
+    ],
+    [
+      25,
+      21,
+      0,
+      22,
+      1,
+      "GUIDER"
+    ],
+    [
+      26,
+      18,
+      1,
+      22,
+      3,
+      "SIGMAS"
+    ],
+    [
+      27,
+      15,
+      0,
+      22,
+      4,
+      "LATENT"
+    ],
+    [
+      28,
+      22,
+      0,
+      23,
+      0,
+      "LATENT"
+    ],
+    [
+      29,
+      11,
+      0,
+      23,
+      1,
+      "VAE"
+    ],
+    [
+      30,
+      7,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      31,
+      23,
+      0,
+      24,
+      1,
+      "IMAGE"
+    ],
+    [
+      32,
+      2,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      33,
+      7,
+      2,
+      25,
+      2,
+      "JWTF_IMAGE_REGION"
+    ],
+    [
+      34,
+      23,
+      0,
+      25,
+      1,
+      "IMAGE"
+    ],
+    [
+      35,
+      25,
+      0,
+      26,
+      0,
+      "IMAGE"
+    ],
+    [
+      36,
+      2,
+      0,
+      27,
+      0,
+      "IMAGE"
+    ],
+    [
+      37,
+      25,
+      0,
+      27,
+      1,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "flux2",
+      "purpose": "smart_face_refine",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}

@@ -1,5 +1,9 @@
 # Example workflows
 
+**Smart_Select_Mask_Editor.json** uses a separate WeVisOne-VL perception checkpoint to select a subject described in words, with an editable mask and detection report. Current ComfyUI detects the architecture automatically with CLIPLoader type `stable_diffusion`.
+
+**Smart_Select_Face_Refine_Flux_2.json** selects a face, enlarges its padded crop, VAE-encodes those pixels and samples the whole crop with a saved Flux.2 reference bundle, then blends through the selection mask into the original image. The soft matte is not used as a latent noise mask because it suppresses redraw repeatedly during sampling. Select the original scene prompt and matching Klein Base 4B components. It processes one region at a time and retains the source image's final resolution. Inspect both crop-scale and final-image comparisons. Denoise 0.20 is conservative; 0.35 makes stronger changes that may alter identity and markings. This is generative refinement, with no guarantee of recovered facial detail.
+
 Open the **Workflows** window and pick the **JezzWTF examples** category, or drag a file from the repository's `example_workflows` folder into ComfyUI. ComfyUI also lists them in its Templates browser under this pack.
 
 | Workflow | What it does | Needs |

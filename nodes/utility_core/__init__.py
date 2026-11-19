@@ -33,6 +33,7 @@ MODULES: tuple[tuple[str, str], ...] = (
     ("image_compare", "Image Compare"),
     ("image_saver", "Image Saver"),
     ("mask_editor", "Mask Editor"),
+    ("smart_selection", "Smart Selection and Region Refinement"),
 )
 _ROUTES_FLAG = "_jezzwtf_utility_core_routes"
 

@@ -52,6 +52,9 @@ def registry() -> dict:
     from comfy_extras import nodes_custom_sampler
     from comfy_extras import nodes_model_advanced, nodes_slg
     from comfy_extras import nodes_images, nodes_post_processing
+    from utility_core.smart_selection import JWTFSmartSelect, JWTFRegionCrop, JWTFRegionComposite
+    from utility_core.mask_editor import JWTFMaskEditor
+    from utility_core.image_compare import JWTFImageCompare
 
     result = dict(core.NODE_CLASS_MAPPINGS)
     for cls in (
@@ -63,6 +66,7 @@ def registry() -> dict:
         nodes_lt.LTXVScheduler, nodes_slg.SkipLayerGuidanceDiTSimple,
         JWTFRefModConditioningCheck,
         nodes_images.GetImageSize, nodes_post_processing.ImageScaleToTotalPixels,
+        JWTFSmartSelect, JWTFRegionCrop, JWTFRegionComposite, JWTFMaskEditor, JWTFImageCompare,
     ):
         result[cls.GET_SCHEMA().node_id] = cls
     result["PreviewAny"] = nodes_preview_any.PreviewAny
@@ -404,6 +408,114 @@ def apply_example(family: str) -> Workflow:
     return w
 
 
+def smart_selection_example(refine=False) -> Workflow:
+    name = "Smart_Select_Face_Refine_Flux_2" if refine else "Smart_Select_Mask_Editor"
+    w = Workflow(name, "flux2" if refine else "wevisone", "smart_face_refine" if refine else "smart_selection")
+    text = (
+        "# Smart selection with native WeVisOne\n\n"
+        "Choose an image and install/select wevisone_vl_2b_int8_convrot.safetensors from Comfy-Org/WeVisOne-VL. "
+        "CLIPLoader uses stable_diffusion as its type: current core auto-detects the WeVisOne architecture from the weights. "
+        "This is a perception model, not the generator's text encoder.\n\n"
+        "Smart Select can select face, person, hair or other descriptions. Segmentation returns alpha mattes; detection returns rectangular masks. "
+        "Largest selects one match per image. Index uses the native detector's zero-based order; inspect the report when several subjects match. "
+        "All keeps every match. No match yields an empty mask and no boxes; Region Crop stops rather than silently refining the whole image.\n\n"
+        "Mask Editor lets you correct the incoming selection after a first run. A saved painting overrides the incoming mask until Use input mask is clicked. Clear saves an all-black painting. "
+        "If painting outside a selected box, disconnect the boxes from Region Crop to derive the crop bounds from the edited mask instead.\n\n"
+    )
+    if refine:
+        text += (
+            "# Face-region refinement\n\n"
+            "Select a Flux.2 reference bundle and matching Klein Base 4B components, including the matching VAE. The original scene prompt guides refinement. "
+            "The selected face is padded and enlarged to a 768-pixel long edge on a 16-pixel grid. "
+            "Its VAE-encoded pixels feed the sampler; references remain active throughout. "
+            "The whole padded crop is sampled. The soft selection mask is applied only at pasteback: "
+            "using that fractional matte as a latent noise mask repeatedly suppresses changes during sampling. "
+            "Denoise 0.20 is a conservative redraw, not guaranteed restoration. Compare the crop at working resolution. "
+            "0.35 produces stronger changes but can alter facial features or tattoo details.\n\n"
+            "Region Composite restores the crop's original size and blends it into the SAME original source image. "
+            "The output stays at the source image's resolution. Only the chosen frame/region is changed; other pixels and alpha are preserved. "
+            "Use an enlarged input first if you also want the whole output at a higher resolution. "
+            "Inspect the mask, crop and before/after comparison; face detection is not identity recognition and refinement cannot guarantee exact identity."
+        )
+    w.node("MarkdownNote", "Setup and selection behaviour", 40, 40, {"text": text}, width=560, height=840)
+    image = w.node("LoadImage", "Source image", 40, 960, {"image": "example.png"}, width=450, height=500)
+    vision = w.node("CLIPLoader", "WeVisOne perception model - separate from generator CLIP", 40, 1550,
+                    {"clip_name": "wevisone_vl_2b_int8_convrot.safetensors", "type": "stable_diffusion", "device": "default"}, width=450, height=160)
+    selection = w.node("JWTFSmartSelect", "Describe the region to select", 680, 40,
+                       {"query": "face" if refine else "person", "task": "segmentation", "selection": "largest"}, width=430, height=310)
+    w.link(vision, 0, selection, "clip")
+    w.link(image, 0, selection, "images")
+    editor = w.node("JWTFMaskEditor", "Review or correct the incoming mask", 1180, 40, width=650, height=700)
+    w.link(image, 0, editor, "images")
+    w.link(selection, 0, editor, "mask")
+    report = w.node("PreviewAny", "Detection and selection report", 680, 440, width=440, height=400)
+    w.link(selection, 2, report, "source")
+    if not refine:
+        mask_preview = w.node("PreviewImage", "Selected alpha matte", 1900, 40, width=520, height=650)
+        w.link(editor, 2, mask_preview, "images")
+        return w
+    crop = w.node("JWTFRegionCrop", "Enlarge the selected face with context", 1900, 40,
+                  {"padding": .25, "long_edge": 768}, width=400, height=240)
+    w.link(image, 0, crop, "images")
+    w.link(selection, 1, crop, "bboxes")
+    w.link(editor, 1, crop, "mask")
+    preview = w.node("PreviewImage", "Crop to be refined", 1900, 380, width=450, height=520)
+    w.link(crop, 0, preview, "images")
+    model = w.node("UNETLoader", "Flux.2 Klein Base 4B", 680, 980,
+                   {"unet_name": PRESETS["flux2"][0], "weight_dtype": "default"}, height=120)
+    clip = w.node("CLIPLoader", "Generation text encoder", 680, 1190,
+                  {"clip_name": PRESETS["flux2"][1], "type": "flux2", "device": "default"}, height=160)
+    vae = w.node("VAELoader", "Matching VAE for crop encoding and decode", 680, 1440,
+                 {"vae_name": PRESETS["flux2"][2]}, height=120)
+    positive = w.node("CLIPTextEncode", "Original scene prompt and desired face detail", 1180, 860,
+                      {"text": "A natural photograph of the person shown in the reference images, seated at a cafe table in a blue shirt, holding a coffee cup. Preserve the facial features, expression and facial markings, with natural skin and beard texture."}, width=500, height=240)
+    negative = w.node("CLIPTextEncode", "Negative", 1180, 1190, {"text": ""}, width=440, height=150)
+    w.link(clip, 0, positive, "clip")
+    w.link(clip, 0, negative, "clip")
+    apply = w.node("JWTFUnifiedRefModApply", "Saved references for the person", 2400, 40,
+                   {"model": "auto (from refmod)", "refmod_1": "None", "ref_strength": 1.0, "ref_on_negative": True}, width=450, height=900)
+    w.link(positive, 0, apply, "positive")
+    w.link(negative, 0, apply, "negative")
+    encoded = w.node("VAEEncode", "Encode the actual face crop", 1900, 1000, height=130)
+    w.link(crop, 0, encoded, "pixels")
+    w.link(vae, 0, encoded, "vae")
+    size = w.node("GetImageSize", "Actual crop dimensions", 1900, 1230, height=130)
+    w.link(crop, 0, size, "image")
+    schedule = w.node("Flux2Scheduler", "Size-aware full schedule", 2920, 980, {"steps": 100, "width": 768, "height": 768}, height=230)
+    w.link(size, 0, schedule, "width")
+    w.link(size, 1, schedule, "height")
+    split = w.node("SplitSigmasDenoise", "Low-noise refinement strength", 2920, 1300, {"denoise": .20}, height=130)
+    w.link(schedule, 0, split, "sigmas")
+    noise = w.node("RandomNoise", "Refinement seed", 2920, 40, {"noise_seed": 7}, height=120)
+    algorithm = w.node("KSamplerSelect", "Euler", 2920, 230, {"sampler_name": "euler"}, height=110)
+    guider = w.node("CFGGuider", "Reference-conditioned face refinement", 2920, 430, {"cfg": 5.0}, height=180)
+    w.link(model, 0, guider, "model")
+    w.link(apply, 0, guider, "positive")
+    w.link(apply, 1, guider, "negative")
+    sampler = w.node("SamplerCustomAdvanced", "Refine crop pixels", 3370, 40, height=280)
+    for source, slot, field in ((noise, 0, "noise"), (algorithm, 0, "sampler"), (guider, 0, "guider"),
+                                (split, 1, "sigmas"), (encoded, 0, "latent_image")):
+        w.link(source, slot, sampler, field)
+    decode = w.node("VAEDecode", "Decode refined face", 3370, 440, height=130)
+    w.link(sampler, 0, decode, "samples")
+    w.link(vae, 0, decode, "vae")
+    crop_compare = w.node("JWTFImageCompare", "Enlarged input versus sampled crop - inspect actual detail", 3370, 1250, width=650, height=750)
+    w.link(crop, 0, crop_compare, "image_a")
+    w.link(decode, 0, crop_compare, "image_b")
+    composite = w.node("JWTFRegionComposite", "Blend back into the original image", 3810, 40,
+                       {"feather": 16, "opacity": 1.0}, width=440, height=200)
+    w.link(image, 0, composite, "images")
+    w.link(crop, 2, composite, "region")
+    w.link(decode, 0, composite, "refined_crop")
+    save = w.node("SaveImage", "Save region-refined image", 4330, 40,
+                  {"filename_prefix": "refmods/face_refine"}, width=450, height=600)
+    w.link(composite, 0, save, "images")
+    compare = w.node("JWTFImageCompare", "Original versus face-refined", 3810, 430, width=650, height=650)
+    w.link(image, 0, compare, "image_a")
+    w.link(composite, 0, compare, "image_b")
+    return w
+
+
 def refmod_upscale_example(family: str, variant: str = "base") -> Workflow:
     if family not in ("flux2", "flux3"):
         raise ValueError("The refinement examples currently cover Flux.2 and Flux 3")
@@ -666,10 +778,11 @@ def main():
         types += ("CheckpointLoaderSimple", "LTXVScheduler", "ModelSamplingFlux", "SkipLayerGuidanceDiTSimple", "EmptyLatentImage")
         types += ("JWTFRefModConditioningCheck",)
         types += ("VAEEncode", "ImageScaleToTotalPixels", "GetImageSize", "SplitSigmasDenoise", "BasicScheduler")
+        types += ("JWTFSmartSelect", "JWTFRegionCrop", "JWTFRegionComposite", "JWTFMaskEditor", "JWTFImageCompare", "SetLatentNoiseMask")
         print(json.dumps({name: {"input": input_spec(name), "output": [str(t) for t in getattr(registry().get(name), "RETURN_TYPES", ())]}
                           for name in types}, default=str))
         return
-    workflows = [bake_example(), bake_example(ltx=True), *(apply_example(family) for family in FAMILIES), audition_example(), moss_diagnostic_example(), character_scene_example(), refmod_upscale_example("flux2"), refmod_upscale_example("flux3"), refmod_upscale_example("flux3", "distilled")]
+    workflows = [bake_example(), bake_example(ltx=True), *(apply_example(family) for family in FAMILIES), audition_example(), moss_diagnostic_example(), character_scene_example(), refmod_upscale_example("flux2"), refmod_upscale_example("flux3"), refmod_upscale_example("flux3", "distilled"), smart_selection_example(), smart_selection_example(refine=True)]
     for workflow in workflows:
         path = OUT / f"{workflow.name}.json"
         path.write_text(json.dumps(workflow.result(), indent=2) + "\n", encoding="utf-8", newline="\n")

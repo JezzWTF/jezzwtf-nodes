@@ -75,6 +75,9 @@ Categories `JezzWTF/utils`, `JezzWTF/image`, `JezzWTF/dataset` and `JezzWTF/cond
 | Multi Load Image | Up to 16 image slots, each with its own output |
 | Mask Composite | Combine two masks at an offset with replace, add, subtract, multiply, min, max, difference or xor, plus opacity, inversion and a soft edge |
 | Mask Editor | Paint or erase masks against an image, with undo, zoom, saved paintings, inversion and feathering |
+| Smart Select (WeVisOne) | Describe a subject to obtain segmentation masks and boxes, with largest, all or indexed selection |
+| Region Crop (Refine) | Enlarge one selected region with context and retain its original position for pasteback |
+| Region Composite (Refine) | Blend a refined crop back into its original image, preserving other frames, outside pixels and alpha |
 | Image Compare | Wipe, blend, difference, toggle or mask comparison, with batch previews and MAE/PSNR metrics |
 | Image Saver (Smart Squeeze) | Save PNG, WebP, JPEG, AVIF or TIFF, with a quality-targeted compression search and an encoding report |
 | Gallery Load | Pick one or many images in a floating gallery window (input or output folders, folders, search) and load them as a batch |
@@ -202,6 +205,8 @@ Drag a file from [`example_workflows/`](example_workflows/) into ComfyUI.
 | `RefMod_Diagnose_MOSS_Image.json` | Compare saved-reference and native MOSS editing with shared prompts, model, seed and target; report baked/fresh latent differences | Existing MOSS bundle, matching VAE, encoder, checkpoint and edit LoRA |
 | `RefMod_Character_New_Scene_Flux_2.json` | Use a saved person reference in a new full-body scene, with independent output dimensions; checked in full-weight generation | Flux.2 Klein Base 4B, Qwen3-4B, full Flux.2 VAE and a Flux.2 reference bundle |
 | `RefMod_Upscale_Refine_Flux_2.json` / `RefMod_Upscale_Refine_Flux_3.json` / `RefMod_Upscale_Refine_Flux_3_Distilled.json` | Enlarge a generated image and refine at low denoise while reapplying the saved references | Matching Base or explicitly named Distilled checkpoint, encoder, VAE and family-specific bundle; Flux 3 variants require separate generation validation |
+| `Smart_Select_Mask_Editor.json` | Describe a subject, inspect its selection and correct the mask | Current ComfyUI with native WeVisOne support and the separate WeVisOne-VL perception weights |
+| `Smart_Select_Face_Refine_Flux_2.json` | Select a face, enlarge and refine its crop with saved references, then blend into the original image | WeVisOne-VL, Flux.2 Klein Base 4B components and a Flux.2 RefMod bundle |
 
 The new RefMod examples use separate bake and apply stages. Select your installed model files and saved bundle before running; each workflow includes setup notes. The existing [Example workflows guide](js/workspace/docs/example-workflows.md) covers the setup.
 

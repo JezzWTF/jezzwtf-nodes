@@ -66,7 +66,7 @@
           "id": "image-tools",
           "title": "Image Compare, Image Saver and Mask Editor",
           "file": "image-tools.md",
-          "keywords": "image compare wipe blend difference mask editor paint erase smart squeeze save png jpeg webp avif ssim compression"
+          "keywords": "image compare wipe blend difference mask editor paint erase smart select wevisone face region crop composite refine refmod smart squeeze save png jpeg webp avif ssim compression"
         },
         {
           "id": "dataset",

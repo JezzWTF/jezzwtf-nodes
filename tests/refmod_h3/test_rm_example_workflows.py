@@ -18,7 +18,7 @@ FILES = sorted((ROOT / "example_workflows").glob("RefMod_Apply_*.json")) + [
     ROOT / "example_workflows" / "RefMod_Reference_Audition.json",
     ROOT / "example_workflows" / "RefMod_Diagnose_MOSS_Image.json",
     ROOT / "example_workflows" / "RefMod_Character_New_Scene_Flux_2.json",
-] + sorted((ROOT / "example_workflows").glob("RefMod_Upscale_Refine_*.json"))
+] + sorted((ROOT / "example_workflows").glob("RefMod_Upscale_Refine_*.json")) + sorted((ROOT / "example_workflows").glob("Smart_Select_*.json"))
 
 
 @pytest.fixture(scope="module")
@@ -76,6 +76,41 @@ def test_character_scene_uses_saved_references_and_independent_matching_target_s
     assert nodes["JWTFUnifiedRefModApply"]["widgets_values_named"]["model"] == "auto (from refmod)"
 
 
+def test_face_refinement_samples_full_crop_and_applies_soft_selection_only_at_pasteback():
+    workflow = read(ROOT / "example_workflows" / "Smart_Select_Face_Refine_Flux_2.json")
+    nodes = {node["type"]: node for node in workflow["nodes"]}
+    links = {link[0]: link for link in workflow["links"]}
+
+    def source(kind, field):
+        node = nodes[kind]
+        return links[next(i["link"] for i in node["inputs"] if i["name"] == field)][1:3]
+
+    assert source("JWTFRegionCrop", "images") == source("JWTFRegionComposite", "images") == [nodes["LoadImage"]["id"], 0]
+    assert source("JWTFRegionCrop", "mask") == [nodes["JWTFMaskEditor"]["id"], 1]
+    assert source("JWTFRegionComposite", "region") == [nodes["JWTFRegionCrop"]["id"], 2]
+    assert source("JWTFRegionComposite", "refined_crop") == [nodes["VAEDecode"]["id"], 0]
+    assert source("VAEEncode", "pixels") == [nodes["JWTFRegionCrop"]["id"], 0]
+    # A fractional matte at every sampling step repeatedly pulls the face toward
+    # the input. Keep it for pasteback; let diffusion refine the whole RGB crop.
+    assert "SetLatentNoiseMask" not in nodes
+    assert source("SamplerCustomAdvanced", "latent_image") == [nodes["VAEEncode"]["id"], 0]
+    assert source("SamplerCustomAdvanced", "sigmas") == [nodes["SplitSigmasDenoise"]["id"], 1]
+    assert source("CFGGuider", "positive") == [nodes["JWTFUnifiedRefModApply"]["id"], 0]
+    assert source("CFGGuider", "negative") == [nodes["JWTFUnifiedRefModApply"]["id"], 1]
+    assert nodes["JWTFUnifiedRefModApply"]["widgets_values_named"]["ref_strength"] == 1
+    assert source("Flux2Scheduler", "width") == [nodes["GetImageSize"]["id"], 0]
+    assert source("Flux2Scheduler", "height") == [nodes["GetImageSize"]["id"], 1]
+    assert source("JWTFSmartSelect", "clip") != source("CLIPTextEncode", "clip")
+    comparisons = [node for node in workflow["nodes"] if node["type"] == "JWTFImageCompare"]
+    pairs = {
+        tuple(tuple(links[s["link"]][1:3]) for field in ("image_a", "image_b")
+              for s in node["inputs"] if s["name"] == field)
+        for node in comparisons
+    }
+    assert ((nodes["JWTFRegionCrop"]["id"], 0), (nodes["VAEDecode"]["id"], 0)) in pairs
+    assert ((nodes["LoadImage"]["id"], 0), (nodes["JWTFRegionComposite"]["id"], 0)) in pairs
+
+
 @pytest.mark.parametrize("path", FILES, ids=lambda p: p.stem)
 def test_workflow_links_widgets_and_required_inputs_match_real_schemas(path, generator):
     data = read(path)
@@ -129,7 +164,11 @@ def test_workflow_links_widgets_and_required_inputs_match_real_schemas(path, gen
         assert kind == destination["type"] or "*" in (kind, destination["type"])
         assert nodes[origin]["order"] < nodes[target]["order"]
     note = next(n for n in nodes.values() if n["type"] == "MarkdownNote")
-    assert note["flags"]["pinned"] and "matching VAE" in note["widgets_values"][0]
+    assert note["flags"]["pinned"]
+    if data["extra"]["jezzwtf_refmod_example"]["purpose"] == "smart_selection":
+        assert "WeVisOne" in note["widgets_values"][0]
+    else:
+        assert "matching VAE" in note["widgets_values"][0]
 
 
 def test_apply_examples_cover_every_registered_family_and_require_a_saved_bundle(generator):

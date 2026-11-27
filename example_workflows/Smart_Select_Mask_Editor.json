@@ -1,0 +1,392 @@
+{
+  "id": "1588cfb2-2c85-5502-bfa4-b16120dca351",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        560,
+        840
+      ],
+      "flags": {
+        "pinned": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Setup and selection behaviour",
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Smart selection with native WeVisOne\n\nChoose an image and install/select wevisone_vl_2b_int8_convrot.safetensors from Comfy-Org/WeVisOne-VL. CLIPLoader uses stable_diffusion as its type: current core auto-detects the WeVisOne architecture from the weights. This is a perception model, not the generator's text encoder.\n\nSmart Select can select face, person, hair or other descriptions. Segmentation returns alpha mattes; detection returns rectangular masks. Largest selects one match per image. Index uses the native detector's zero-based order; inspect the report when several subjects match. All keeps every match. No match yields an empty mask and no boxes; Region Crop stops rather than silently refining the whole image.\n\nMask Editor lets you correct the incoming selection after a first run. A saved painting overrides the incoming mask until Use input mask is clicked. Clear saves an all-black painting. If painting outside a selected box, disconnect the boxes from Region Crop to derive the crop bounds from the edited mask instead.\n\n"
+      ],
+      "widgets_values_named": {
+        "text": "# Smart selection with native WeVisOne\n\nChoose an image and install/select wevisone_vl_2b_int8_convrot.safetensors from Comfy-Org/WeVisOne-VL. CLIPLoader uses stable_diffusion as its type: current core auto-detects the WeVisOne architecture from the weights. This is a perception model, not the generator's text encoder.\n\nSmart Select can select face, person, hair or other descriptions. Segmentation returns alpha mattes; detection returns rectangular masks. Largest selects one match per image. Index uses the native detector's zero-based order; inspect the report when several subjects match. All keeps every match. No match yields an empty mask and no boxes; Region Crop stops rather than silently refining the whole image.\n\nMask Editor lets you correct the incoming selection after a first run. A saved painting overrides the incoming mask until Use input mask is clicked. Clear saves an all-black painting. If painting outside a selected box, disconnect the boxes from Region Crop to derive the crop bounds from the edited mask instead.\n\n"
+      }
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        960
+      ],
+      "size": [
+        450,
+        500
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2,
+            3
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "Source image",
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png"
+      ],
+      "widgets_values_named": {
+        "image": "example.png"
+      }
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        1550
+      ],
+      "size": [
+        450,
+        160
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "WeVisOne perception model - separate from generator CLIP",
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "wevisone_vl_2b_int8_convrot.safetensors",
+        "stable_diffusion",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "wevisone_vl_2b_int8_convrot.safetensors",
+        "type": "stable_diffusion",
+        "device": "default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "JWTFSmartSelect",
+      "pos": [
+        680,
+        40
+      ],
+      "size": [
+        430,
+        310
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        },
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "bboxes",
+          "type": "BOUNDING_BOX",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            5
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Describe the region to select",
+      "properties": {
+        "Node name for S&R": "JWTFSmartSelect"
+      },
+      "widgets_values": [
+        "person",
+        "segmentation",
+        "largest",
+        0,
+        1024
+      ],
+      "widgets_values_named": {
+        "query": "person",
+        "task": "segmentation",
+        "selection": "largest",
+        "selection_index": 0,
+        "max_length": 1024
+      }
+    },
+    {
+      "id": 5,
+      "type": "JWTFMaskEditor",
+      "pos": [
+        1180,
+        40
+      ],
+      "size": [
+        650,
+        700
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 4,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "mask_image",
+          "type": "IMAGE",
+          "links": [
+            6
+          ],
+          "slot_index": 2
+        }
+      ],
+      "title": "Review or correct the incoming mask",
+      "properties": {
+        "Node name for S&R": "JWTFMaskEditor"
+      },
+      "widgets_values": [
+        "",
+        false,
+        0
+      ],
+      "widgets_values_named": {
+        "painted_mask": "",
+        "invert": false,
+        "feather": 0
+      }
+    },
+    {
+      "id": 6,
+      "type": "PreviewAny",
+      "pos": [
+        680,
+        440
+      ],
+      "size": [
+        440,
+        400
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Detection and selection report",
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 7,
+      "type": "PreviewImage",
+      "pos": [
+        1900,
+        40
+      ],
+      "size": [
+        520,
+        650
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "Selected alpha matte",
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      2,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      3,
+      2,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      1,
+      "MASK"
+    ],
+    [
+      5,
+      4,
+      2,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      5,
+      2,
+      7,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        30,
+        30
+      ]
+    },
+    "jezzwtf_refmod_example": {
+      "family": "wevisone",
+      "purpose": "smart_selection",
+      "schema_version": 1
+    }
+  },
+  "version": 0.4
+}
